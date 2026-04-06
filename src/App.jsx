@@ -477,9 +477,13 @@ export default function App() {
 
     // Save to backend if user is logged in
     if (user && user.id) {
+      console.log('Current user in updateStatus:', user);
       const chapterId = getChapterId(subject, index);
       console.log(`Attempting to save progress: subject=${subject}, index=${index}, chapterId=${chapterId}, status=${status}`);
-      if (!chapterId) return;
+      if (!chapterId) {
+          console.warn('Cannot save progress: No chapterId found.');
+          return;
+      }
 
       try {
         const res = await fetch('/api/progress', {
