@@ -1041,9 +1041,31 @@ export default function App() {
   const GoalsView = () => {
     const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const [newTaskText, setNewTaskText] = useState('');
+    const [isAddingBlock, setIsAddingBlock] = useState(false);
+    const [newBlock, setNewBlock] = useState({ time: '', title: '', type: 'Study', duration: '', theme: 'blue' });
 
     const currentSchedule = timetableSchedules.filter(s => s.day === selectedDay);
     const completedTasksWeeklyCount = timetableTasks.filter(t => t.done).length;
+
+    const handleAddSchedule = async (e) => {
+      e.preventDefault();
+      if (!newBlock.time || !newBlock.title || !newBlock.duration) return;
+      try {
+        const res = await fetch('/api/schedule', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, day: selectedDay, ...newBlock })
+        });
+        const data = await res.json();
+        if (data.success) {
+          setTimetableSchedules([...timetableSchedules, data.schedule]);
+          setIsAddingBlock(false);
+          setNewBlock({ time: '', title: '', type: 'Study', duration: '', theme: 'blue' });
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    };
 
     const handleToggleTask = async (taskId, currentStatus) => {
       // Optimistic up
@@ -1206,10 +1228,42 @@ export default function App() {
                   <div className="relative flex items-start gap-5 md:gap-8 pt-4">
                     <div className="absolute -left-[20px] md:-left-[17px] top-6 w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-[#444b55] z-10 border-2 border-white dark:border-[#161923]"></div>
                     <div className="w-16 md:w-20 shrink-0"></div>
-                    <button className="flex-1 p-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-[#444b55] bg-slate-50/50 dark:bg-[#0B0E14]/50 text-slate-500 dark:text-slate-400 font-bold text-sm hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all flex items-center justify-center gap-2 group shadow-sm">
-                      <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-[#333942] group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 flex items-center justify-center transition-colors"><Plus size={14} /></div>
-                      Add Time Block
-                    </button>
+                    <div className="flex-1">
+                      {!isAddingBlock ? (
+                        <button onClick={() => setIsAddingBlock(true)} className="w-full p-4 rounded-2xl border-2 border-dashed border-slate-300 dark:border-[#444b55] bg-slate-50/50 dark:bg-[#0B0E14]/50 text-slate-500 dark:text-slate-400 font-bold text-sm hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/10 transition-all flex items-center justify-center gap-2 group shadow-sm">
+                          <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-[#333942] group-hover:bg-blue-200 dark:group-hover:bg-blue-900/50 flex items-center justify-center transition-colors"><Plus size={14} /></div>
+                          Add Time Block
+                        </button>
+                      ) : (
+                        <form onSubmit={handleAddSchedule} className="p-5 rounded-2xl border border-slate-200 dark:border-[#333942] bg-white dark:bg-[#22262e]/70 backdrop-blur-sm shadow-sm space-y-3">
+                           <div className="flex justify-between items-center mb-2">
+                              <h4 className="font-bold text-sm">New Block ({selectedDay})</h4>
+                              <button type="button" onClick={() => setIsAddingBlock(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"><X size={16} /></button>
+                           </div>
+                           <div className="grid grid-cols-2 gap-3">
+                              <input type="text" placeholder="Time (e.g. 08:00 AM)" value={newBlock.time} onChange={e => setNewBlock({...newBlock, time: e.target.value})} className="bg-slate-50 dark:bg-[#0B0E14] border border-slate-200 dark:border-[#333942] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100" required />
+                              <input type="text" placeholder="Duration (e.g. 2h)" value={newBlock.duration} onChange={e => setNewBlock({...newBlock, duration: e.target.value})} className="bg-slate-50 dark:bg-[#0B0E14] border border-slate-200 dark:border-[#333942] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100" required />
+                           </div>
+                           <input type="text" placeholder="Title (e.g. Physics: Thermodynamics)" value={newBlock.title} onChange={e => setNewBlock({...newBlock, title: e.target.value})} className="w-full bg-slate-50 dark:bg-[#0B0E14] border border-slate-200 dark:border-[#333942] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100" required />
+                           <div className="grid grid-cols-2 gap-3">
+                              <select value={newBlock.type} onChange={e => setNewBlock({...newBlock, type: e.target.value})} className="bg-slate-50 dark:bg-[#0B0E14] border border-slate-200 dark:border-[#333942] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100">
+                                <option value="Study">Study</option>
+                                <option value="Practice">Practice</option>
+                                <option value="Exam">Exam</option>
+                              </select>
+                              <select value={newBlock.theme} onChange={e => setNewBlock({...newBlock, theme: e.target.value})} className="bg-slate-50 dark:bg-[#0B0E14] border border-slate-200 dark:border-[#333942] rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-blue-500 text-slate-900 dark:text-slate-100">
+                                <option value="blue">Blue</option>
+                                <option value="emerald">Emerald</option>
+                                <option value="orange">Orange</option>
+                                <option value="purple">Purple</option>
+                                <option value="rose">Rose</option>
+                                <option value="slate">Slate</option>
+                              </select>
+                           </div>
+                           <button type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 rounded-xl text-sm transition-colors mt-2">Create Block</button>
+                        </form>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
