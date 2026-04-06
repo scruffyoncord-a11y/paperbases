@@ -19,6 +19,20 @@ model User {
   doubts    Doubt[]
   replies   Reply[]
   subjects  Subject[]
+  resources Resource[]
+}
+
+model Resource {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String?
+  subject     String   // e.g. "Physics", "Chemistry"
+  fileUrl     String
+  fileType    String   // e.g. "pdf", "image"
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model Subject {

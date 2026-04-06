@@ -417,6 +417,55 @@ app.delete('/api/replies/:id', async (req, res) => {
   }
 });
 
+// --- Resource Sharing API ---
+
+// Get all resources
+app.get('/api/resources', async (req, res) => {
+  const { subject } = req.query;
+  try {
+    const where = subject && subject !== 'All' ? { subject } : {};
+    const resources = await prisma.resource.findMany({
+      where,
+      include: {
+        user: { select: { id: true, name: true, picture: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, resources });
+  } catch (error) {
+    console.error('Error fetching resources:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Create a new resource
+app.post('/api/resources', async (req, res) => {
+  const { userId, title, description, subject, fileUrl, fileType } = req.body;
+  if (!userId || !title || !subject || !fileUrl) {
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+  
+  try {
+    const resource = await prisma.resource.create({
+      data: {
+        userId: parseInt(userId, 10),
+        title,
+        description,
+        subject,
+        fileUrl,
+        fileType: fileType || 'pdf'
+      },
+      include: {
+        user: { select: { id: true, name: true, picture: true } }
+      }
+    });
+    res.json({ success: true, resource });
+  } catch (error) {
+    console.error('Error creating resource:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Mark doubt as resolved
 app.put('/api/doubts/:id/resolve', async (req, res) => {
   const doubtId = parseInt(req.params.id, 10);

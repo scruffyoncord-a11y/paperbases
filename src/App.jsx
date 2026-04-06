@@ -170,6 +170,12 @@ export default function App() {
   const [syllabusData, setSyllabusData] = useState(null); // From DB
   const [syllabusProgress, setSyllabusProgress] = useState({}); 
 
+  // Resource Sharing State
+  const [dbResources, setDbResources] = useState([]);
+  const [resourceFilter, setResourceFilter] = useState('All');
+  const [isUploadingResource, setIsUploadingResource] = useState(false);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+
   // Compute current syllabus (DB version or default)
   const CURRENT_SYLLABUS = useMemo(() => {
     if (syllabusData) {
@@ -251,6 +257,18 @@ export default function App() {
         .catch(console.error);
     }
   }, [user?.id]);
+
+  useEffect(() => {
+    if (activeTab === 'Resources') {
+        const url = resourceFilter === 'All' ? '/api/resources' : `/api/resources?subject=${resourceFilter}`;
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) setDbResources(data.resources);
+            })
+            .catch(console.error);
+    }
+  }, [activeTab, resourceFilter]);
 
   useEffect(() => {
     if (activeTab === 'Doubts') {
@@ -389,6 +407,51 @@ export default function App() {
     } catch(err) {
         console.error(err);
     }
+  };
+
+  const handleUploadResource = async (e) => {
+    e.preventDefault();
+    if (!user) return alert('Please login to upload.');
+    setIsUploadingResource(true);
+    const formData = new FormData(e.target);
+    const title = formData.get('title');
+    const description = formData.get('description');
+    const subject = formData.get('subject');
+    const file = formData.get('file');
+
+    if (!file || !file.name) {
+        alert('Please select a file.');
+        setIsUploadingResource(false);
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = async () => {
+        try {
+            const res = await fetch('/api/resources', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    userId: user.id,
+                    title,
+                    description,
+                    subject,
+                    fileUrl: reader.result,
+                    fileType: file.type.includes('pdf') ? 'pdf' : 'image'
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setDbResources([data.resource, ...dbResources]);
+                setShowUploadModal(false);
+                e.target.reset();
+            }
+        } catch (err) {
+            console.error(err);
+        }
+        setIsUploadingResource(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   const updateStatus = async (subject, index, status) => {
@@ -627,29 +690,45 @@ export default function App() {
     );
   };
 
-  const ResourcesView = () => (
-    <section className="animate-in fade-in duration-500">
-      <div className="flex justify-between items-center mb-2">
-        <h2 className="font-bold text-lg text-slate-900 dark:text-white">Study Resources</h2>
-        <button className="text-xs font-bold text-blue-600 dark:text-blue-500 uppercase tracking-widest hover:text-blue-500 dark:hover:text-blue-400 transition">View All</button>
-      </div>
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">Quick revision notes, formula sheets, and mind maps for last-minute prep.</p>
-      <div className="w-full mb-8">
-        <div className="flex items-center w-full max-w-2xl bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl px-5 py-3.5 shadow-sm hover:border-blue-400 dark:hover:border-blue-500/50 focus-within:border-blue-500 focus-within:ring-1 focus-within:ring-blue-500 transition-all">
-          <Search size={20} className="text-blue-500" />
-          <input type="text" placeholder="Search for formulas, notes, or topics..." className="flex-1 bg-transparent outline-none text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 ml-3 text-sm" />
+  const ResourcesView = () => {
+    const availableSubjects = ['All', ...modeSubjects[syllabusMode]];
+
+    return (
+      <section className="animate-in fade-in duration-500">
+        <div className="flex justify-between items-center mb-2">
+          <h2 className="font-bold text-lg text-slate-900 dark:text-white">Study Resources</h2>
+          <button className="text-xs font-bold text-blue-600 dark:text-blue-500 uppercase tracking-widest hover:text-blue-500 dark:hover:text-blue-400 transition">View All</button>
         </div>
-      </div>
-      <div className="flex gap-6 border-b border-slate-200 dark:border-white/10 mb-6">
-        <button onClick={() => setResourceTab('Quick Access')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Quick Access' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Quick Access</button>
-        <button onClick={() => setResourceTab('Browse')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Browse' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Browse</button>
-      </div>
-      {resourceTab === 'Quick Access' && (
-        <>
+        <p className="text-xs text-slate-500 dark:text-slate-400 mb-6">Quick revision notes, formula sheets, and mind maps for prep.</p>
+        
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+            <div className="flex items-center flex-1 bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 shadow-sm focus-within:border-blue-500 transition-all">
+                <Search size={18} className="text-blue-500" />
+                <input type="text" placeholder="Search resources..." className="flex-1 bg-transparent outline-none text-slate-900 dark:text-white placeholder:text-slate-400 ml-3 text-sm" />
+            </div>
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+                {availableSubjects.map(sub => (
+                    <button 
+                        key={sub} 
+                        onClick={() => setResourceFilter(sub)}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all whitespace-nowrap ${resourceFilter === sub ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white/80 dark:bg-[#161923]/60 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-blue-400'}`}
+                    >
+                        {sub}
+                    </button>
+                ))}
+            </div>
+        </div>
+
+        <div className="flex gap-6 border-b border-slate-200 dark:border-white/10 mb-6">
+          <button onClick={() => setResourceTab('Quick Access')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Quick Access' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Quick Access</button>
+          <button onClick={() => setResourceTab('Browse')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Browse' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Browse Community</button>
+        </div>
+
+        {resourceTab === 'Quick Access' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {resources.map((res, i) => (
-              <div key={i} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-4 rounded-xl shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all cursor-pointer flex items-center gap-4 group">
-                <div className={`p-3 rounded-lg ${res.bg} ${res.iconColor} group-hover:scale-110 transition-transform border border-slate-100 dark:border-white/5`}>{res.icon}</div>
+              <div key={i} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-4 rounded-xl shadow-sm hover:border-blue-400 transition-all cursor-pointer flex items-center gap-4 group">
+                <div className={`p-3 rounded-lg ${res.bg} ${res.iconColor} group-hover:scale-110 transition-transform`}>{res.icon}</div>
                 <div>
                   <h4 className="font-bold text-slate-900 dark:text-white text-sm">{res.title}</h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400">{res.desc}</p>
@@ -657,39 +736,105 @@ export default function App() {
               </div>
             ))}
           </div>
-          <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl rounded-[2rem] p-10 shadow-sm dark:shadow-lg dark:shadow-black/20 border border-slate-200 dark:border-white/10 text-center mt-12 mb-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 rounded-2xl flex items-center justify-center mx-auto mb-6 border border-blue-100 dark:border-blue-500/20">
-              <UploadCloud size={32} />
-            </div>
-            <h1 className="text-3xl font-extrabold text-slate-900 dark:text-white mb-4 tracking-tight">Contribute Materials</h1>
-            <p className="text-slate-500 dark:text-slate-400 mb-10 max-w-lg mx-auto leading-relaxed">Upload PDFs, Study Notes, or Formula Sheets. Help the community and keep your materials organized in one place.</p>
-            <div className="border-2 border-dashed border-slate-300 dark:border-[#444b55] rounded-[2rem] p-12 bg-slate-50/50 dark:bg-[#2d323c]/40 hover:bg-slate-100 dark:hover:bg-[#2d323c]/70 hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors cursor-pointer group relative">
-              <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" accept=".pdf,image/*" />
-              <div className="w-16 h-16 bg-white dark:bg-[#15181e] rounded-full flex items-center justify-center mx-auto mb-5 border border-slate-200 dark:border-[#333942] text-slate-400 group-hover:text-blue-500 group-hover:scale-110 transition-all duration-300 shadow-sm dark:shadow-md dark:shadow-black/40">
-                <UploadCloud size={28} />
-              </div>
-              <p className="text-slate-900 dark:text-white font-bold text-lg mb-2">Drag & drop files here</p>
-              <p className="text-slate-500 text-sm mb-6">or</p>
-              <button className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold pointer-events-none">Browse Files</button>
-            </div>
+        )}
+
+        {resourceTab === 'Browse' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
+            {dbResources.length === 0 ? (
+                <div className="col-span-full py-20 text-center text-slate-500">
+                    <FolderSearch size={48} className="mx-auto mb-4 opacity-20" />
+                    <p>No resources found for this subject.</p>
+                </div>
+            ) : (
+                dbResources.map((res) => (
+                    <div key={res.id} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm hover:border-blue-500 transition-all group">
+                        <div className="flex items-start justify-between mb-4">
+                            <div className={`p-3 rounded-xl ${getSubjectColor(res.subject)}`}>
+                                {res.fileType === 'pdf' ? <FileText size={20} /> : <ImageIcon size={20} />}
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{timeAgo(res.createdAt)}</span>
+                        </div>
+                        <h4 className="font-bold text-slate-900 dark:text-white mb-1 group-hover:text-blue-500 transition-colors">{res.title}</h4>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 h-8">{res.description}</p>
+                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold">
+                                    {res.user.picture ? <img src={res.user.picture} className="w-full h-full rounded-full" /> : res.user.name[0]}
+                                </div>
+                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{res.user.name}</span>
+                            </div>
+                            <a href={res.fileUrl} download={res.title} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 font-bold text-[10px] flex items-center gap-1">
+                                <UploadCloud size={14} /> DOWNLOAD
+                            </a>
+                        </div>
+                    </div>
+                ))
+            )}
           </div>
-        </>
-      )}
-      {resourceTab === 'Browse' && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-          {browseCategories.map((cat, i) => (
-            <div key={i} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] p-6 rounded-xl shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all cursor-pointer flex flex-col items-center gap-3 group">
-              <div className={`p-4 rounded-full ${cat.color} ${cat.iconColor} group-hover:scale-110 transition-transform border border-slate-100 dark:border-white/5`}><FileText size={24} /></div>
-              <div className="text-center">
-                <h4 className="font-bold text-slate-900 dark:text-white text-sm">{cat.name}</h4>
-                <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">{cat.count}</span>
-              </div>
-            </div>
-          ))}
+        )}
+
+        {/* Upload CTA */}
+        <div className="bg-gradient-to-r from-blue-600/10 to-indigo-600/10 dark:from-blue-600/20 dark:to-indigo-600/20 rounded-[2rem] p-8 md:p-12 text-center mt-12 mb-4 border border-blue-200 dark:border-blue-500/20">
+          <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-3">Help your friends succeed!</h3>
+          <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-lg mx-auto">Upload your revision notes, formula sheets, or hand-written solutions to help the community.</p>
+          <button 
+            onClick={() => setShowUploadModal(true)}
+            className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl shadow-blue-600/20 hover:scale-105 transition-all flex items-center gap-3 mx-auto"
+          >
+            <Upload size={20} /> UPLOAD RESOURCE
+          </button>
         </div>
-      )}
-    </section>
-  );
+
+        {/* Upload Modal */}
+        {showUploadModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+                <div className="bg-white dark:bg-[#161923] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-in slide-in-from-bottom-8 duration-500">
+                    <div className="p-8 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
+                        <div>
+                            <h3 className="text-xl font-black text-slate-900 dark:text-white">Share Resource</h3>
+                            <p className="text-xs text-slate-500">Upload PDFs or revision notes.</p>
+                        </div>
+                        <button onClick={() => setShowUploadModal(false)} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center hover:bg-slate-200 transition-colors"><X size={20} /></button>
+                    </div>
+                    <form onSubmit={handleUploadResource} className="p-8 space-y-5">
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Title</label>
+                            <input name="title" required placeholder="e.g. Physics Formula Sheet" className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm" />
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Subject</label>
+                            <select name="subject" required className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm">
+                                {modeSubjects[syllabusMode].map(sub => <option key={sub} value={sub}>{sub}</option>)}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Description</label>
+                            <textarea name="description" rows="3" placeholder="What is inside this resource?" className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm resize-none"></textarea>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">File (PDF or Image)</label>
+                            <div className="relative group cursor-pointer">
+                                <input type="file" name="file" required accept=".pdf,image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
+                                <div className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl p-6 bg-slate-50 dark:bg-black/20 group-hover:border-blue-500 transition-all flex flex-col items-center">
+                                    <UploadCloud size={32} className="text-slate-300 group-hover:text-blue-500" />
+                                    <span className="text-xs text-slate-400 mt-2">Click or drag & drop</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button 
+                            disabled={isUploadingResource}
+                            className="w-full py-4 rounded-2xl bg-blue-600 text-white font-black shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                        >
+                            {isUploadingResource ? <Sparkles className="animate-spin" /> : <Upload size={20} />}
+                            {isUploadingResource ? 'UPLOADING...' : 'PUBLISH RESOURCE'}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        )}
+      </section>
+    );
+  };
 
 
 
