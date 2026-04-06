@@ -239,14 +239,22 @@ export default function App() {
   useEffect(() => {
     if (user && user.id) {
       // Validate user still exists in DB (handles database resets)
-      fetch(`/api/progress/${user.id}`)
+      fetch(`/api/auth/validate/${user.id}`)
         .then(res => res.json())
         .then(data => {
           if (data.success) {
-            setSyllabusProgress(data.progress);
-          } else if (data.message === 'Server error') {
-            // User might not exist anymore after DB reset
-            console.warn('User validation failed, clearing session');
+            // User exists, now fetch their progress
+            fetch(`/api/progress/${user.id}`)
+              .then(r => r.json())
+              .then(pData => {
+                if (pData.success) {
+                  setSyllabusProgress(pData.progress);
+                }
+              })
+              .catch(console.error);
+          } else {
+            // User doesn't exist in DB anymore — force re-login
+            console.warn('Stale session detected, user not found in DB. Logging out.');
             localStorage.removeItem('peakprep_user');
             localStorage.removeItem('peakprep_progress');
             setUser(null);

@@ -61,6 +61,12 @@ async function initializeSyllabus(userId) {
   // No longer needed
 }
 
+// Helper: check if a user exists in the DB
+async function validateUser(userId) {
+  const user = await prisma.user.findUnique({ where: { id: parseInt(userId, 10) } });
+  return user;
+}
+
 // API Endpoints
 
 // Google Login Endpoint
@@ -166,10 +172,30 @@ app.get('/api/syllabus/:userId', async (req, res) => {
   res.json({ success: true, subjects: UNIFIED_SYLLABUS });
 });
 
+// Validate user session
+app.get('/api/auth/validate/:userId', async (req, res) => {
+  try {
+    const user = await validateUser(req.params.userId);
+    if (!user) {
+      return res.json({ success: false, message: 'User not found' });
+    }
+    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture } });
+  } catch (error) {
+    console.error('Error validating user:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Get User Progress
 app.get('/api/progress/:userId', async (req, res) => {
   const { userId } = req.params;
   try {
+    // Check user exists first
+    const user = await validateUser(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
     const progressRecords = await prisma.progress.findMany({
       where: { userId: parseInt(userId, 10) },
     });
@@ -203,6 +229,12 @@ app.post('/api/progress', async (req, res) => {
   try {
     const userIdInt = parseInt(userId, 10);
     const chapterIndexInt = parseInt(chapterIndex, 10);
+
+    // Verify user exists before writing
+    const user = await validateUser(userIdInt);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
 
     // Upsert progress using simplified codes
     const progress = await prisma.progress.upsert({
@@ -282,6 +314,12 @@ app.post('/api/doubts', async (req, res) => {
   }
   
   try {
+    // Verify user exists before writing
+    const user = await validateUser(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
     const doubt = await prisma.doubt.create({
       data: {
         userId: parseInt(userId, 10),
@@ -400,6 +438,12 @@ app.post('/api/resources', async (req, res) => {
   }
   
   try {
+    // Verify user exists before writing
+    const user = await validateUser(userId);
+    if (!user) {
+      return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
     const resource = await prisma.resource.create({
       data: {
         userId: parseInt(userId, 10),
