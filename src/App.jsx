@@ -204,6 +204,12 @@ export default function App() {
   const [isSubmittingDoubt, setIsSubmittingDoubt] = useState(false); 
   const [doubtImage, setDoubtImage] = useState(null); 
 
+  // Timetable & Goals State
+  const [timetableTasks, setTimetableTasks] = useState([]);
+  const [timetableSchedules, setTimetableSchedules] = useState([]);
+  const [timetableStats, setTimetableStats] = useState({ streak: 0, focusTime: 0 });
+  const [isGoalsLoading, setIsGoalsLoading] = useState(true);
+
   const modeSubjects = useMemo(() => ({
     jee: ['Maths', 'Physics', 'Chemistry'],
     neet: ['Physics', 'Chemistry', 'Biology'],
@@ -292,6 +298,23 @@ export default function App() {
         .catch(console.error);
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'Goals' && user?.id) {
+      setIsGoalsLoading(true);
+      fetch(`/api/timetable/${user.id}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+               setTimetableTasks(data.tasks);
+               setTimetableSchedules(data.schedules);
+               setTimetableStats(data.stats);
+            }
+        })
+        .catch(console.error)
+        .finally(() => setIsGoalsLoading(false));
+    }
+  }, [activeTab, user?.id]);
 
   const handleAskDoubt = async (e) => {
     e.preventDefault();
@@ -1017,41 +1040,47 @@ export default function App() {
 
   const GoalsView = () => {
     const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const weeklySchedule = {
-      Mon: [
-        { time: '08:00 AM', title: 'Physics: Thermodynamics', type: 'Study', duration: '2h', theme: 'blue' },
-        { time: '10:30 AM', title: 'Maths PYQs: Calculus', type: 'Practice', duration: '1.5h', theme: 'orange' },
-        { time: '02:00 PM', title: 'Chemistry: p-Block Elements', type: 'Study', duration: '2h', theme: 'emerald' },
-        { time: '05:00 PM', title: 'Full Length Mock Test 4', type: 'Exam', duration: '3h', theme: 'purple' },
-      ],
-      Tue: [
-        { time: '08:00 AM', title: 'Physics: Kinematics', type: 'Study', duration: '2.5h', theme: 'blue' },
-        { time: '11:00 AM', title: 'Chemistry Revision', type: 'Practice', duration: '1h', theme: 'emerald' },
-        { time: '02:00 PM', title: 'Maths: Coordinate Geometry', type: 'Study', duration: '2h', theme: 'orange' },
-      ],
-      Wed: [
-        { time: '09:00 AM', title: 'Biology: Human Physiology', type: 'Study', duration: '3h', theme: 'rose' },
-        { time: '01:00 PM', title: 'Physics Formulae Revision', type: 'Practice', duration: '1h', theme: 'blue' },
-        { time: '03:00 PM', title: 'Previous Year Paper 2023', type: 'Exam', duration: '3h', theme: 'purple' },
-      ],
-      Thu: [
-        { time: '08:00 AM', title: 'Maths: Algebra', type: 'Study', duration: '2h', theme: 'orange' },
-        { time: '10:30 AM', title: 'Chemistry: Organic', type: 'Study', duration: '2h', theme: 'emerald' },
-        { time: '02:00 PM', title: 'Physics: Optics Mock', type: 'Practice', duration: '1.5h', theme: 'blue' },
-      ],
-      Fri: [
-        { time: '08:30 AM', title: 'Chemistry PYQs', type: 'Practice', duration: '2h', theme: 'emerald' },
-        { time: '11:00 AM', title: 'Biology: Plant Physiology', type: 'Study', duration: '2h', theme: 'rose' },
-        { time: '03:00 PM', title: 'Weekly Revision', type: 'Study', duration: '3h', theme: 'slate' },
-      ],
-      Sat: [
-        { time: '09:00 AM', title: 'Full Length Grand Mock', type: 'Exam', duration: '3h', theme: 'purple' },
-        { time: '02:00 PM', title: 'Mock Test Analysis', type: 'Practice', duration: '2h', theme: 'slate' },
-      ],
-      Sun: [
-        { time: '10:00 AM', title: 'Backlog Clearing', type: 'Study', duration: '3h', theme: 'rose' },
-        { time: '02:00 PM', title: 'Light Review & Planning', type: 'Practice', duration: '1h', theme: 'slate' },
-      ]
+    const [newTaskText, setNewTaskText] = useState('');
+
+    const currentSchedule = timetableSchedules.filter(s => s.day === selectedDay);
+    const completedTasksWeeklyCount = timetableTasks.filter(t => t.done).length;
+
+    const handleToggleTask = async (taskId, currentStatus) => {
+      // Optimistic up
+      setTimetableTasks(timetableTasks.map(t => t.id === taskId ? { ...t, done: !currentStatus } : t));
+      try {
+        const res = await fetch(`/api/tasks/${taskId}/toggle`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id, done: !currentStatus })
+        });
+        const data = await res.json();
+        if (!data.success) {
+          setTimetableTasks(timetableTasks.map(t => t.id === taskId ? { ...t, done: currentStatus } : t));
+        }
+      } catch (e) {
+        setTimetableTasks(timetableTasks.map(t => t.id === taskId ? { ...t, done: currentStatus } : t));
+      }
+    };
+
+    const handleAddTask = async (e) => {
+      e.preventDefault();
+      if (!newTaskText.trim()) return;
+      const t = { userId: user.id, title: newTaskText, subject: 'General', color: 'text-slate-500' };
+      try {
+        const res = await fetch('/api/tasks', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(t)
+        });
+        const data = await res.json();
+        if (data.success) {
+          setTimetableTasks([data.task, ...timetableTasks]);
+          setNewTaskText('');
+        }
+      } catch (e) {
+        console.error(e);
+      }
     };
 
     const getThemeClasses = (theme) => {
@@ -1078,8 +1107,6 @@ export default function App() {
       return themes[theme] || themes.slate;
     };
 
-    const currentSchedule = weeklySchedule[selectedDay] || [];
-
     return (
       <section className="animate-in fade-in duration-500 max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
@@ -1091,9 +1118,9 @@ export default function App() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           {[
-            { icon: <CheckCircle2 size={28} />, value: '12/15', label: 'Completed This Week', bg: 'bg-emerald-50 dark:bg-emerald-500/10', iconColor: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-100 dark:border-emerald-500/20' },
-            { icon: <Flame size={28} />, value: '4', label: 'Day Streak', bg: 'bg-orange-50 dark:bg-orange-500/10', iconColor: 'text-orange-600 dark:text-orange-400', border: 'border-orange-100 dark:border-orange-500/20' },
-            { icon: <Clock size={28} />, value: '28h', label: 'Focus Time', bg: 'bg-blue-50 dark:bg-blue-500/10', iconColor: 'text-blue-600 dark:text-blue-400', border: 'border-blue-100 dark:border-blue-500/20' },
+            { icon: <CheckCircle2 size={28} />, value: `${completedTasksWeeklyCount}/${timetableTasks.length}`, label: 'Tasks Completed', bg: 'bg-emerald-50 dark:bg-emerald-500/10', iconColor: 'text-emerald-600 dark:text-emerald-400', border: 'border-emerald-100 dark:border-emerald-500/20' },
+            { icon: <Flame size={28} />, value: timetableStats?.streak || '0', label: 'Day Streak', bg: 'bg-orange-50 dark:bg-orange-500/10', iconColor: 'text-orange-600 dark:text-orange-400', border: 'border-orange-100 dark:border-orange-500/20' },
+            { icon: <Clock size={28} />, value: `${timetableStats?.focusTime || 0}h`, label: 'Focus Time', bg: 'bg-blue-50 dark:bg-blue-500/10', iconColor: 'text-blue-600 dark:text-blue-400', border: 'border-blue-100 dark:border-blue-500/20' },
           ].map((stat, i) => (
             <div key={i} className="bg-white/80 dark:bg-[#161923]/80 backdrop-blur-xl border border-slate-200 dark:border-[#333942] p-6 rounded-3xl shadow-sm dark:shadow-lg dark:shadow-black/20 flex items-center gap-5 hover:-translate-y-1 transition-transform">
               <div className={`w-14 h-14 rounded-2xl ${stat.bg} ${stat.iconColor} border ${stat.border} flex items-center justify-center shadow-inner`}>{stat.icon}</div>
@@ -1112,13 +1139,10 @@ export default function App() {
                 <button className="text-xs font-bold text-blue-600 dark:text-blue-500 uppercase tracking-widest">View All</button>
               </div>
               <div className="p-4 space-y-2 flex-1">
-                {[
-                  { title: "Complete Integral Calculus PYQs", subject: "Maths", color: "text-orange-500", done: true },
-                  { title: "Read Thermodynamics NCERT", subject: "Physics", color: "text-blue-500", done: false },
-                  { title: "Revise p-Block Elements", subject: "Chemistry", color: "text-emerald-500", done: false },
-                  { title: "Attempt Full Length Mock Test 4", subject: "All Subjects", color: "text-purple-500", done: false },
-                ].map((task, i) => (
-                  <div key={i} className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-[#2d323c]/70 rounded-2xl transition-colors group cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-[#444b55]">
+                {isGoalsLoading ? (
+                   <div className="text-sm text-slate-500 text-center py-6">Loading tasks...</div>
+                ) : timetableTasks.length > 0 ? timetableTasks.map((task, i) => (
+                  <div key={i} onClick={() => handleToggleTask(task.id, task.done)} className="flex items-center justify-between p-4 hover:bg-slate-50 dark:hover:bg-[#2d323c]/70 rounded-2xl transition-colors group cursor-pointer border border-transparent hover:border-slate-200 dark:hover:border-[#444b55]">
                     <div className="flex items-center gap-4">
                       <div className={`w-6 h-6 rounded-md border-2 flex items-center justify-center transition-colors ${task.done ? 'border-emerald-500 bg-emerald-500 text-white' : 'border-slate-300 dark:border-[#444b55] text-transparent group-hover:border-blue-500'}`}><CheckCircle2 size={16} /></div>
                       <div>
@@ -1127,7 +1151,19 @@ export default function App() {
                       </div>
                     </div>
                   </div>
-                ))}
+                )) : (
+                   <div className="text-sm text-slate-500 text-center py-6 border border-dashed rounded-xl border-slate-200 dark:border-[#333942]">
+                     No tasks for today. Start by adding one!
+                   </div>
+                )}
+              </div>
+              <div className="p-4 border-t border-slate-100 dark:border-[#444b55] bg-slate-50/50 dark:bg-[#1C1F29]/50">
+                <form onSubmit={handleAddTask} className="flex gap-2">
+                   <input type="text" value={newTaskText} onChange={(e) => setNewTaskText(e.target.value)} placeholder="Add a new task..." className="flex-1 bg-white dark:bg-[#0B0E14] border border-slate-200 dark:border-[#333942] rounded-xl px-4 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:border-blue-500" />
+                   <button type="submit" disabled={!newTaskText.trim()} className="bg-blue-600 hover:bg-blue-700 disabled:bg-slate-300 dark:disabled:bg-slate-700 disabled:cursor-not-allowed text-white w-10 h-10 rounded-xl flex items-center justify-center transition-colors">
+                     <Plus size={18} />
+                   </button>
+                </form>
               </div>
             </div>
           </div>

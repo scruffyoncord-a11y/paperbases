@@ -15,11 +15,15 @@ model User {
   picture   String?
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
+  streak    Int        @default(0)
+  focusTime Int        @default(0) // minutes
   progress  Progress[]
   doubts    Doubt[]
   replies   Reply[]
   resources Resource[]
   resourceLikes ResourceLike[]
+  tasks       Task[]
+  schedules   ScheduleSlot[]
 }
 
 model Resource {
@@ -45,6 +49,32 @@ model ResourceLike {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([resourceId, userId])
+}
+
+model Task {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  title     String
+  subject   String
+  color     String?
+  done      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model ScheduleSlot {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  day       String   // e.g., "Mon", "Tue"
+  time      String   // e.g., "08:00 AM"
+  title     String   
+  type      String   // "Study", "Practice", "Exam"
+  duration  String   // e.g., "2h"
+  theme     String   // e.g., "blue", "orange"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Progress {

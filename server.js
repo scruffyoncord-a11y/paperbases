@@ -531,6 +531,92 @@ app.put('/api/doubts/:id/resolve', async (req, res) => {
   }
 });
 
+// --- Timetable & Goals API ---
+
+// Get Timetable Data
+app.get('/api/timetable/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId, 10);
+  try {
+    const user = await validateUser(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const tasks = await prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
+    const schedules = await prisma.scheduleSlot.findMany({ where: { userId }, orderBy: { time: 'asc' } });
+    
+    res.json({ 
+      success: true, 
+      tasks, 
+      schedules, 
+      stats: { streak: user.streak, focusTime: user.focusTime } 
+    });
+  } catch (error) {
+    console.error('Error fetching timetable:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Add Task
+app.post('/api/tasks', async (req, res) => {
+  const { userId, title, subject, color } = req.body;
+  if (!userId || !title || !subject) return res.status(400).json({ success: false, message: 'Missing fields' });
+  
+  try {
+    const user = await validateUser(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const task = await prisma.task.create({
+      data: { userId: parseInt(userId, 10), title, subject, color: color || 'text-slate-500' }
+    });
+    res.json({ success: true, task });
+  } catch (error) {
+    console.error('Error adding task:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Toggle Task
+app.put('/api/tasks/:id/toggle', async (req, res) => {
+  const taskId = parseInt(req.params.id, 10);
+  const { userId, done } = req.body;
+  try {
+    const user = await validateUser(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const existing = await prisma.task.findUnique({ where: { id: taskId } });
+    if (!existing || existing.userId !== parseInt(userId, 10)) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+    const task = await prisma.task.update({
+      where: { id: taskId },
+      data: { done }
+    });
+    res.json({ success: true, task });
+  } catch (error) {
+    console.error('Error toggling task:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Add Schedule
+app.post('/api/schedule', async (req, res) => {
+  const { userId, day, time, title, type, duration, theme } = req.body;
+  if (!userId || !day || !time || !title || !type || !duration || !theme) {
+    return res.status(400).json({ success: false, message: 'Missing fields' });
+  }
+  
+  try {
+    const user = await validateUser(userId);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    const schedule = await prisma.scheduleSlot.create({
+      data: { userId: parseInt(userId, 10), day, time, title, type, duration, theme }
+    });
+    res.json({ success: true, schedule });
+  } catch (error) {
+    console.error('Error adding schedule:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Production: Serve frontend
 if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, 'dist')));
