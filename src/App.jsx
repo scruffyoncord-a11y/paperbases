@@ -238,16 +238,25 @@ export default function App() {
 
   useEffect(() => {
     if (user && user.id) {
-      // Fetch Syllabus
-      // Fetch Progress
+      // Validate user still exists in DB (handles database resets)
       fetch(`/api/progress/${user.id}`)
         .then(res => res.json())
         .then(data => {
           if (data.success) {
             setSyllabusProgress(data.progress);
+          } else if (data.message === 'Server error') {
+            // User might not exist anymore after DB reset
+            console.warn('User validation failed, clearing session');
+            localStorage.removeItem('peakprep_user');
+            localStorage.removeItem('peakprep_progress');
+            setUser(null);
+            setIsAuthenticated(false);
+            setAuthPage('login');
           }
         })
-        .catch(console.error);
+        .catch(err => {
+          console.error('Failed to validate user:', err);
+        });
     }
   }, [user?.id]);
 
