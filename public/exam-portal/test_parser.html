@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Parser Regression Test</title>
+</head>
+<body>
+<pre id="out">Loading...</pre>
+<script src="parser.js"></script>
+<script>
+try {
+  const cases = [
+    {
+      name: 'Option images before labels stay with options',
+      markdown: "61. Which of the following gives meso compound as product?\n\n<div style=\"text-align: center;\"><img src=\"imgs/option_A.jpg\" alt=\"Image\" width=\"22%\" /></div>\n\n<div style=\"text-align: center;\">(A)</div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/option_B.jpg\" alt=\"Image\" width=\"23%\" /></div>\n\n<div style=\"text-align: center;\">(B)</div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/option_C.jpg\" alt=\"Image\" width=\"26%\" /></div>\n\n<div style=\"text-align: center;\">(C)</div>\n\n<div style=\"text-align: center;\"><img src=\"imgs/option_D.jpg\" alt=\"Image\" width=\"21%\" /></div>\n\n<div style=\"text-align: center;\">(D)</div>\n\n62. Next question here\n(A) opt1 (B) opt2 (C) opt3 (D) opt4\n",
+      assert: function(result) {
+        const q = result.questions.find(function(item) { return item.id === 61; });
+        if (!q) return ['Question 61 missing'];
+        const issues = [];
+        ['A', 'B', 'C', 'D'].forEach(function(label) {
+          const expected = 'option_' + label;
+          const opt = q.options.find(function(item) { return item.label === label.toLowerCase(); });
+          if (!opt) issues.push('Missing option ' + label);
+          else if (!opt.image || opt.image.indexOf(expected) === -1) issues.push('Option ' + label + ' image mismatch: ' + (opt.image || 'none'));
+        });
+        if (q.image) issues.push('Question image should be empty, got ' + q.image);
+        return issues;
+      }
+    },
+    {
+      name: 'Single stem image remains with question and option text can continue after page break',
+      markdown: "56. Compound I is heated to give products.\n\n<div><img src=\"imgs/img_in_image_box_100_200_700_520.jpg\" /></div>\n\n(A)\nfirst part of option A\n\n(B)\nfirst part of option B\n\n---PAGE BREAK---\ncontinues on next page\n\n(C)\nOption C text\n\n(D)\nOption D text\n\n57. Next question\n(A) next (B) next (C) next (D) next\n",
+      assert: function(result) {
+        const q = result.questions.find(function(item) { return item.id === 56; });
+        if (!q) return ['Question 56 missing'];
+        const issues = [];
+        if (!q.image || q.image.indexOf('100_200_700_520') === -1) issues.push('Stem image was not kept as question image');
+        const optionB = q.options.find(function(item) { return item.label === 'b'; });
+        if (!optionB) issues.push('Missing option B');
+        else if (optionB.text.indexOf('continues on next page') === -1) issues.push('Option B continuation text was lost: ' + optionB.text);
+        return issues;
+      }
+    }
+  ];
+
+  function parseCase(markdown) {
+    return ExamParser.parse({
+      result: {
+        layoutParsingResults: [{
+          markdown: { text: markdown, images: {} }
+        }]
+      }
+    });
+  }
+
+  let log = '';
+  let passed = 0;
+
+  cases.forEach(function(testCase, index) {
+    const result = parseCase(testCase.markdown);
+    const issues = testCase.assert(result);
+    const ok = issues.length === 0;
+    if (ok) passed += 1;
+    log += (ok ? 'PASS ' : 'FAIL ') + (index + 1) + '. ' + testCase.name + '\n';
+    if (!ok) {
+      issues.forEach(function(issue) {
+        log += '  - ' + issue + '\n';
+      });
+    }
+    log += '\n';
+  });
+
+  log += passed + '/' + cases.length + ' cases passed';
+  document.getElementById('out').textContent = log;
+} catch (e) {
+  document.getElementById('out').textContent = 'ERROR: ' + e.message + '\n' + e.stack;
+}
+</script>
+</body>
+</html>

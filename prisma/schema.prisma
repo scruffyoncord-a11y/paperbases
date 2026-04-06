@@ -1,0 +1,58 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
+  password  String?
+  name      String?
+  picture   String?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  progress  Progress[]
+  doubts    Doubt[]
+  replies   Reply[]
+}
+
+model Progress {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  subject      String
+  chapterIndex Int
+  status       Int      @default(0) // 0: untouched, 1: skipped, 2: learning, 3: mastered
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, subject, chapterIndex])
+}
+
+model Doubt {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  subject   String
+  title     String
+  content   String
+  imageUrl  String?  // New field for media uploads
+  status    String   @default("Unanswered") // Unanswered, Resolved
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  replies   Reply[]
+}
+
+model Reply {
+  id        Int      @id @default(autoincrement())
+  doubtId   Int
+  userId    Int
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  doubt     Doubt    @relation(fields: [doubtId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
