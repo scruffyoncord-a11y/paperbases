@@ -912,7 +912,7 @@ export default function App() {
             <div className="fixed inset-0 z-[100] flex flex-col bg-slate-900/95 backdrop-blur-xl animate-in fade-in duration-300">
                 <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#0B0E14] shrink-0">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => setSelectedResource(null)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors text-white"><X size={20} /></button>
+                        <button onClick={() => setSelectedResource(null)} className="px-4 py-2 rounded-xl bg-white/5 flex items-center justify-center gap-2 hover:bg-white/10 transition-colors text-white font-bold border border-white/10 shadow-sm"><ArrowLeft size={18} /> Back</button>
                         <div>
                             <h3 className="text-xl font-black text-white">{selectedResource.title}</h3>
                             <div className="flex items-center gap-2 mt-1">
@@ -936,7 +936,12 @@ export default function App() {
                 <div className="flex-1 w-full bg-[#161923] p-4 md:p-8 flex items-center justify-center overflow-hidden">
                     <div className="w-full max-w-5xl h-full bg-white rounded-xl overflow-hidden shadow-2xl relative border border-white/10">
                         {selectedResource.fileType === 'pdf' ? (
-                            <embed src={selectedResource.fileUrl} type="application/pdf" className="w-full h-full" />
+                            <iframe 
+                                src={selectedResource.fileUrl.startsWith('http') ? `https://docs.google.com/viewer?url=${encodeURIComponent(selectedResource.fileUrl)}&embedded=true` : selectedResource.fileUrl} 
+                                title={selectedResource.title}
+                                className="w-full h-full border-0" 
+                                allowFullScreen
+                            />
                         ) : (
                             <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
                                 <img src={selectedResource.fileUrl} alt={selectedResource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
