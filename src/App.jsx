@@ -177,32 +177,12 @@ export default function App() {
   const [showUploadModal, setShowUploadModal] = useState(false);
 
   // Compute current syllabus (DB version or default)
-  const CURRENT_SYLLABUS = useMemo(() => {
-    if (syllabusData) {
-      const formatted = {};
-      syllabusData.forEach(sub => {
-        formatted[sub.name] = sub.chapters.map(c => c.name);
-      });
-      return formatted;
-    }
-    return UNIFIED_SYLLABUS;
-  }, [syllabusData]);
+  // Simplified Syllabus
+  const CURRENT_SYLLABUS = UNIFIED_SYLLABUS;
 
   const getChapterId = (subject, index) => {
-    if (!syllabusData) {
-        console.warn('getChapterId failed: syllabusData is null');
-        return null;
-    }
-    const sub = syllabusData.find(s => s.name === subject);
-    if (!sub) {
-        console.warn(`getChapterId failed: subject ${subject} not found in syllabusData`);
-        return null;
-    }
-    const chapterId = sub.chapters[index]?.id;
-    if (!chapterId) {
-        console.warn(`getChapterId failed: chapter index ${index} not found for subject ${subject}`);
-    }
-    return chapterId;
+    // Obsolete in simplified model
+    return `${subject}-${index}`;
   };
 
   // Doubt Forum State
@@ -247,15 +227,6 @@ export default function App() {
   useEffect(() => {
     if (user && user.id) {
       // Fetch Syllabus
-      fetch(`/api/syllabus/${user.id}`)
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            setSyllabusData(data.subjects);
-          }
-        })
-        .catch(console.error);
-
       // Fetch Progress
       fetch(`/api/progress/${user.id}`)
         .then(res => res.json())
@@ -477,29 +448,19 @@ export default function App() {
 
     // Save to backend if user is logged in
     if (user && user.id) {
-      console.log('Current user in updateStatus:', user);
-      const chapterId = getChapterId(subject, index);
-      console.log(`Attempting to save progress: subject=${subject}, index=${index}, chapterId=${chapterId}, status=${status}`);
-      if (!chapterId) {
-          console.warn('Cannot save progress: No chapterId found.');
-          return;
-      }
-
       try {
         const res = await fetch('/api/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.id,
-            chapterId,
+            subject,
+            chapterIndex: index,
             status
           })
         });
         const data = await res.json();
         console.log(`Progress save result for ${subject}/${index}:`, data);
-        if (!data.success) {
-            console.error('Failed to save progress on server:', data.message);
-        }
       } catch (error) {
         console.error('Network error while saving progress:', error);
       }
@@ -1403,12 +1364,6 @@ export default function App() {
                     <button onClick={() => setSyllabusMode('neet')} className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${syllabusMode === 'neet' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>NEET</button>
                   </div>
                 </div>
-                {!syllabusData ? (
-                    <div className="flex items-center gap-2 text-blue-600 font-bold animate-pulse">
-                        <Sparkles size={20} />
-                        Initializing syllabus...
-                    </div>
-                ) : (
                 <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl px-6 py-3 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm dark:shadow-lg dark:shadow-black/20 flex items-center gap-4">
                   <div className="text-right">
                     <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{syllabusMode.toUpperCase()} Completion</div>
@@ -1416,17 +1371,8 @@ export default function App() {
                   </div>
                   <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-black/50 border border-slate-200 dark:border-white/5 flex items-center justify-center"><Trophy size={20} className="text-amber-500 dark:text-amber-400" /></div>
                 </div>
-                )}
               </div>
-              {!syllabusData && (
-                <div className="py-20 text-center">
-                    <Activity className="mx-auto text-blue-500 animate-spin mb-4" size={48} />
-                    <p className="text-slate-500 font-bold">Synchronizing your syllabus data...</p>
-                </div>
-              )}
-              {syllabusData && (
-                <>
-                  <div className="flex gap-4 mb-8 overflow-x-auto no-scrollbar pb-2">
+              <div className="flex gap-4 mb-8 overflow-x-auto no-scrollbar pb-2">
                 {modeSubjects[syllabusMode]?.map(sub => (
                   <button key={sub} onClick={() => setActiveSubject(sub)} className={`px-6 py-4 rounded-2xl text-sm font-bold whitespace-nowrap transition-all flex flex-col items-start gap-2 border min-w-[150px] shadow-sm dark:shadow-lg dark:shadow-black/20 backdrop-blur-xl ${activeSubject === sub ? 'bg-slate-50 dark:bg-white/10 border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400' : 'bg-white/80 dark:bg-[#161923]/60 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-white/20 hover:text-slate-800 dark:hover:text-white'}`}>
                     <span className="uppercase text-[10px] tracking-widest opacity-70">{sub}</span>
@@ -1460,8 +1406,6 @@ export default function App() {
                   );
                 })}
               </div>
-            </>
-          )}
         </div>
       )}
 

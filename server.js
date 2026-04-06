@@ -56,50 +56,9 @@ const UNIFIED_SYLLABUS = {
   ]
 };
 
-// Helper function to initialize syllabus for a new user
+// Helper function to initialize syllabus - obsolete in simplified model
 async function initializeSyllabus(userId) {
-  for (const [subjectName, chapters] of Object.entries(UNIFIED_SYLLABUS)) {
-    // Check if this specific subject already exists for the user
-    let subject = await prisma.subject.findUnique({
-      where: {
-        userId_name: {
-          userId: userId,
-          name: subjectName,
-        }
-      }
-    });
-
-    if (!subject) {
-      subject = await prisma.subject.create({
-        data: {
-          name: subjectName,
-          userId: userId,
-        }
-      });
-    }
-
-    // Check if chapters exist for this subject
-    const chapterCount = await prisma.chapter.count({ where: { subjectId: subject.id } });
-    if (chapterCount < chapters.length) {
-      // Missing some chapters, let's create them if they don't exist
-      for (let i = 0; i < chapters.length; i++) {
-        await prisma.chapter.upsert({
-          where: {
-            subjectId_name: {
-              subjectId: subject.id,
-              name: chapters[i],
-            }
-          },
-          update: { order: i },
-          create: {
-            name: chapters[i],
-            subjectId: subject.id,
-            order: i
-          }
-        });
-      }
-    }
-  }
+  // No longer needed
 }
 
 // API Endpoints
@@ -202,34 +161,9 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
-// Get User Syllabus
+// Get User Syllabus (Static Version)
 app.get('/api/syllabus/:userId', async (req, res) => {
-  const userId = parseInt(req.params.userId, 10);
-  try {
-    const subjects = await prisma.subject.findMany({
-      where: { userId },
-      include: {
-        chapters: {
-          orderBy: { order: 'asc' }
-        }
-      }
-    });
-
-    // If no syllabus found, try to initialize it
-    if (subjects.length === 0) {
-        await initializeSyllabus(userId);
-        const newSubjects = await prisma.subject.findMany({
-            where: { userId },
-            include: { chapters: { orderBy: { order: 'asc' } } }
-        });
-        return res.json({ success: true, subjects: newSubjects });
-    }
-
-    res.json({ success: true, subjects });
-  } catch (error) {
-    console.error('Error fetching syllabus:', error);
-    res.status(500).json({ success: false, message: 'Server error' });
-  }
+  res.json({ success: true, subjects: UNIFIED_SYLLABUS });
 });
 
 // Get User Progress
@@ -238,24 +172,16 @@ app.get('/api/progress/:userId', async (req, res) => {
   try {
     const progressRecords = await prisma.progress.findMany({
       where: { userId: parseInt(userId, 10) },
-      include: {
-        chapter: {
-          include: { subject: true }
-        }
-      }
     });
     
-    // Format back into the syllabusProgress structure expected by App.jsx
-    // But now we'll also need to support chapter IDs on frontend
+    // Format into simpler structure: { subject: { chapterIndex: status } }
     const formattedProgress = {};
     progressRecords.forEach((record) => {
-      const subjectName = record.chapter.subject.name;
-      const chapterIndex = record.chapter.order;
-      
-      if (!formattedProgress[subjectName]) {
-        formattedProgress[subjectName] = {};
+      const { subject, chapterIndex, status } = record;
+      if (!formattedProgress[subject]) {
+        formattedProgress[subject] = {};
       }
-      formattedProgress[subjectName][chapterIndex] = record.status;
+      formattedProgress[subject][chapterIndex] = status;
     });
 
     res.json({ success: true, progress: formattedProgress });
@@ -267,38 +193,35 @@ app.get('/api/progress/:userId', async (req, res) => {
 
 // Update Progress
 app.post('/api/progress', async (req, res) => {
-  const { userId, chapterId, status } = req.body;
-  console.log(`Update progress received: userId=${userId}, chapterId=${chapterId}, status=${status}`);
+  const { userId, subject, chapterIndex, status } = req.body;
+  console.log(`Update progress received: userId=${userId}, subject=${subject}, chapterIndex=${chapterIndex}, status=${status}`);
   
-  if (!userId || !chapterId) {
+  if (!userId || !subject || chapterIndex === undefined) {
     return res.status(400).json({ success: false, message: 'Missing fields' });
   }
 
   try {
     const userIdInt = parseInt(userId, 10);
-    const chapterIdInt = parseInt(chapterId, 10);
+    const chapterIndexInt = parseInt(chapterIndex, 10);
 
-    if (isNaN(userIdInt) || isNaN(chapterIdInt)) {
-        return res.status(400).json({ success: false, message: 'Invalid userId or chapterId' });
-    }
-
-    // Upsert progress with explicit numeric values
+    // Upsert progress using simplified codes
     const progress = await prisma.progress.upsert({
       where: {
-        userId_chapterId: {
+        userId_subject_chapterIndex: {
           userId: userIdInt,
-          chapterId: chapterIdInt,
+          subject,
+          chapterIndex: chapterIndexInt,
         },
       },
       update: { status: parseInt(status, 10) || 0 },
       create: {
         userId: userIdInt,
-        chapterId: chapterIdInt,
+        subject,
+        chapterIndex: chapterIndexInt,
         status: parseInt(status, 10) || 0,
       },
     });
     
-    console.log(`Progress successfully saved: ${JSON.stringify(progress)}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating progress:', error);
