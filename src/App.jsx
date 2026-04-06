@@ -168,7 +168,18 @@ export default function App() {
   const [syllabusMode, setSyllabusMode] = useState('jee'); 
   const [activeSubject, setActiveSubject] = useState('Physics');
   const [syllabusData, setSyllabusData] = useState(null); // From DB
-  const [syllabusProgress, setSyllabusProgress] = useState({}); 
+  const [syllabusProgress, setSyllabusProgress] = useState(() => {
+    try {
+      const savedProgress = localStorage.getItem('peakprep_progress');
+      return savedProgress ? JSON.parse(savedProgress) : {};
+    } catch {
+      return {};
+    }
+  }); 
+
+  useEffect(() => {
+    localStorage.setItem('peakprep_progress', JSON.stringify(syllabusProgress));
+  }, [syllabusProgress]);
 
   // Resource Sharing State
   const [dbResources, setDbResources] = useState([]);
@@ -439,9 +450,7 @@ export default function App() {
     // Optimistic UI update
     setSyllabusProgress(prev => {
       const newProgress = { ...prev };
-      if (!newProgress[subject]) {
-        newProgress[subject] = {};
-      }
+      newProgress[subject] = { ...(prev[subject] || {}) };
       newProgress[subject][index] = status;
       return newProgress;
     });
