@@ -10,7 +10,7 @@
     "postinstall": "prisma generate",
     "lint": "eslint .",
     "preview": "vite preview",
-    "start": "npx prisma db push --accept-data-loss && node server.js"
+    "start": "npx prisma db push --accept-data-loss --force-reset && node server.js"
   },
   "dependencies": {
     "@prisma/client": "^5.22.0",
