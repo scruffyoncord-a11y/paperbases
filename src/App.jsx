@@ -189,10 +189,20 @@ export default function App() {
   }, [syllabusData]);
 
   const getChapterId = (subject, index) => {
-    if (!syllabusData) return null;
+    if (!syllabusData) {
+        console.warn('getChapterId failed: syllabusData is null');
+        return null;
+    }
     const sub = syllabusData.find(s => s.name === subject);
-    if (!sub) return null;
-    return sub.chapters[index]?.id;
+    if (!sub) {
+        console.warn(`getChapterId failed: subject ${subject} not found in syllabusData`);
+        return null;
+    }
+    const chapterId = sub.chapters[index]?.id;
+    if (!chapterId) {
+        console.warn(`getChapterId failed: chapter index ${index} not found for subject ${subject}`);
+    }
+    return chapterId;
   };
 
   // Doubt Forum State
@@ -468,10 +478,11 @@ export default function App() {
     // Save to backend if user is logged in
     if (user && user.id) {
       const chapterId = getChapterId(subject, index);
+      console.log(`Attempting to save progress: subject=${subject}, index=${index}, chapterId=${chapterId}, status=${status}`);
       if (!chapterId) return;
 
       try {
-        await fetch('/api/progress', {
+        const res = await fetch('/api/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -480,6 +491,8 @@ export default function App() {
             status
           })
         });
+        const data = await res.json();
+        console.log('Progress save result:', data);
       } catch (error) {
         console.error('Failed to save progress', error);
       }

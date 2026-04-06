@@ -248,6 +248,7 @@ app.get('/api/progress/:userId', async (req, res) => {
 // Update Progress
 app.post('/api/progress', async (req, res) => {
   const { userId, chapterId, status } = req.body;
+  console.log(`Update progress received: userId=${userId}, chapterId=${chapterId}, status=${status}`);
   
   if (!userId || !chapterId) {
     return res.status(400).json({ success: false, message: 'Missing fields' });
