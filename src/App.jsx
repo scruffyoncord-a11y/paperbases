@@ -136,6 +136,47 @@ const getStatusText = (status, repliesCount) => {
   return 'Unanswered';
 };
 
+const AdobePdfViewer = ({ url, title }) => {
+  useEffect(() => {
+    let script = document.getElementById('adobe-pdf-script');
+    if (!script) {
+      script = document.createElement('script');
+      script.id = 'adobe-pdf-script';
+      script.src = 'https://documentcloud.adobe.com/view-sdk/main.js';
+      document.body.appendChild(script);
+    }
+    
+    // IMPORTANT: The key below often only works seamlessly on localhost and domains like codepen. 
+    // To deploy to railway/production, configure your own Client ID in adobe's developer console.
+    const clientId = '9861538238544cb39de183afeb1eaaa0'; 
+    
+    const initView = () => {
+      if (window.AdobeDC) {
+        const adobeDCView = new window.AdobeDC.View({
+          clientId: clientId,
+          divId: "adobe-dc-view"
+        });
+        adobeDCView.previewFile({
+          content: { location: { url } },
+          metaData: { fileName: title || "Document.pdf" }
+        }, { embedMode: "SIZED_CONTAINER" });
+      }
+    };
+
+    if (window.AdobeDC) {
+      initView();
+    } else {
+      document.addEventListener("adobe_dc_view_sdk.ready", initView);
+    }
+
+    return () => {
+      document.removeEventListener("adobe_dc_view_sdk.ready", initView);
+    };
+  }, [url, title]);
+
+  return <div id="adobe-dc-view" className="w-full h-full"></div>;
+};
+
 export default function App() {
   const [user, setUser] = useState(() => {
     try {
@@ -936,12 +977,7 @@ export default function App() {
                 <div className="flex-1 w-full bg-[#161923] p-4 md:p-8 flex items-center justify-center overflow-hidden">
                     <div className="w-full max-w-5xl h-full bg-white rounded-xl overflow-hidden shadow-2xl relative border border-white/10">
                         {selectedResource.fileType === 'pdf' ? (
-                            <iframe 
-                                src={selectedResource.fileUrl.startsWith('http') ? `https://docs.google.com/viewer?url=${encodeURIComponent(selectedResource.fileUrl)}&embedded=true` : selectedResource.fileUrl} 
-                                title={selectedResource.title}
-                                className="w-full h-full border-0" 
-                                allowFullScreen
-                            />
+                            <AdobePdfViewer url={selectedResource.fileUrl} title={selectedResource.title} />
                         ) : (
                             <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
                                 <img src={selectedResource.fileUrl} alt={selectedResource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
