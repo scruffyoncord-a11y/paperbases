@@ -58,26 +58,46 @@ const UNIFIED_SYLLABUS = {
 
 // Helper function to initialize syllabus for a new user
 async function initializeSyllabus(userId) {
-  // Check if syllabus already exists
-  const count = await prisma.subject.count({ where: { userId } });
-  if (count > 0) return;
-
   for (const [subjectName, chapters] of Object.entries(UNIFIED_SYLLABUS)) {
-    const subject = await prisma.subject.create({
-      data: {
-        name: subjectName,
-        userId: userId,
+    // Check if this specific subject already exists for the user
+    let subject = await prisma.subject.findUnique({
+      where: {
+        userId_name: {
+          userId: userId,
+          name: subjectName,
+        }
       }
     });
 
-    for (let i = 0; i < chapters.length; i++) {
-        await prisma.chapter.create({
-            data: {
-                name: chapters[i],
-                subjectId: subject.id,
-                order: i
+    if (!subject) {
+      subject = await prisma.subject.create({
+        data: {
+          name: subjectName,
+          userId: userId,
+        }
+      });
+    }
+
+    // Check if chapters exist for this subject
+    const chapterCount = await prisma.chapter.count({ where: { subjectId: subject.id } });
+    if (chapterCount < chapters.length) {
+      // Missing some chapters, let's create them if they don't exist
+      for (let i = 0; i < chapters.length; i++) {
+        await prisma.chapter.upsert({
+          where: {
+            subjectId_name: {
+              subjectId: subject.id,
+              name: chapters[i],
             }
+          },
+          update: { order: i },
+          create: {
+            name: chapters[i],
+            subjectId: subject.id,
+            order: i
+          }
         });
+      }
     }
   }
 }
@@ -255,22 +275,30 @@ app.post('/api/progress', async (req, res) => {
   }
 
   try {
-    // Upsert progress
-    await prisma.progress.upsert({
+    const userIdInt = parseInt(userId, 10);
+    const chapterIdInt = parseInt(chapterId, 10);
+
+    if (isNaN(userIdInt) || isNaN(chapterIdInt)) {
+        return res.status(400).json({ success: false, message: 'Invalid userId or chapterId' });
+    }
+
+    // Upsert progress with explicit numeric values
+    const progress = await prisma.progress.upsert({
       where: {
         userId_chapterId: {
-          userId: parseInt(userId, 10),
-          chapterId: parseInt(chapterId, 10),
+          userId: userIdInt,
+          chapterId: chapterIdInt,
         },
       },
-      update: { status },
+      update: { status: parseInt(status, 10) || 0 },
       create: {
-        userId: parseInt(userId, 10),
-        chapterId: parseInt(chapterId, 10),
-        status,
+        userId: userIdInt,
+        chapterId: chapterIdInt,
+        status: parseInt(status, 10) || 0,
       },
     });
     
+    console.log(`Progress successfully saved: ${JSON.stringify(progress)}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Error updating progress:', error);

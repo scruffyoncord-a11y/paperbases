@@ -496,9 +496,12 @@ export default function App() {
           })
         });
         const data = await res.json();
-        console.log('Progress save result:', data);
+        console.log(`Progress save result for ${subject}/${index}:`, data);
+        if (!data.success) {
+            console.error('Failed to save progress on server:', data.message);
+        }
       } catch (error) {
-        console.error('Failed to save progress', error);
+        console.error('Network error while saving progress:', error);
       }
     }
   };
@@ -1400,6 +1403,12 @@ export default function App() {
                     <button onClick={() => setSyllabusMode('neet')} className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${syllabusMode === 'neet' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>NEET</button>
                   </div>
                 </div>
+                {!syllabusData ? (
+                    <div className="flex items-center gap-2 text-blue-600 font-bold animate-pulse">
+                        <Sparkles size={20} />
+                        Initializing syllabus...
+                    </div>
+                ) : (
                 <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl px-6 py-3 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm dark:shadow-lg dark:shadow-black/20 flex items-center gap-4">
                   <div className="text-right">
                     <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">{syllabusMode.toUpperCase()} Completion</div>
@@ -1407,8 +1416,17 @@ export default function App() {
                   </div>
                   <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-black/50 border border-slate-200 dark:border-white/5 flex items-center justify-center"><Trophy size={20} className="text-amber-500 dark:text-amber-400" /></div>
                 </div>
+                )}
               </div>
-              <div className="flex gap-4 mb-8 overflow-x-auto no-scrollbar pb-2">
+              {!syllabusData && (
+                <div className="py-20 text-center">
+                    <Activity className="mx-auto text-blue-500 animate-spin mb-4" size={48} />
+                    <p className="text-slate-500 font-bold">Synchronizing your syllabus data...</p>
+                </div>
+              )}
+              {syllabusData && (
+                <>
+                  <div className="flex gap-4 mb-8 overflow-x-auto no-scrollbar pb-2">
                 {modeSubjects[syllabusMode]?.map(sub => (
                   <button key={sub} onClick={() => setActiveSubject(sub)} className={`px-6 py-4 rounded-2xl text-sm font-bold whitespace-nowrap transition-all flex flex-col items-start gap-2 border min-w-[150px] shadow-sm dark:shadow-lg dark:shadow-black/20 backdrop-blur-xl ${activeSubject === sub ? 'bg-slate-50 dark:bg-white/10 border-blue-400 dark:border-blue-500 text-blue-600 dark:text-blue-400' : 'bg-white/80 dark:bg-[#161923]/60 border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:border-slate-300 dark:hover:border-white/20 hover:text-slate-800 dark:hover:text-white'}`}>
                     <span className="uppercase text-[10px] tracking-widest opacity-70">{sub}</span>
@@ -1442,8 +1460,10 @@ export default function App() {
                   );
                 })}
               </div>
-            </div>
+            </>
           )}
+        </div>
+      )}
 
           {activeTab === 'Tests' && (
             <div className="max-w-4xl mx-auto mt-4 animate-in fade-in duration-500 flex flex-col items-center">
