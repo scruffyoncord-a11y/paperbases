@@ -167,7 +167,27 @@ export default function App() {
   const [selectedDay, setSelectedDay] = useState('Mon');
   const [syllabusMode, setSyllabusMode] = useState('jee'); 
   const [activeSubject, setActiveSubject] = useState('Physics');
+  const [syllabusData, setSyllabusData] = useState(null); // From DB
   const [syllabusProgress, setSyllabusProgress] = useState({}); 
+
+  // Compute current syllabus (DB version or default)
+  const CURRENT_SYLLABUS = useMemo(() => {
+    if (syllabusData) {
+      const formatted = {};
+      syllabusData.forEach(sub => {
+        formatted[sub.name] = sub.chapters.map(c => c.name);
+      });
+      return formatted;
+    }
+    return UNIFIED_SYLLABUS;
+  }, [syllabusData]);
+
+  const getChapterId = (subject, index) => {
+    if (!syllabusData) return null;
+    const sub = syllabusData.find(s => s.name === subject);
+    if (!sub) return null;
+    return sub.chapters[index]?.id;
+  };
 
   // Doubt Forum State
   const [doubts, setDoubts] = useState([]);
@@ -207,6 +227,30 @@ export default function App() {
       localStorage.removeItem('peakprep_user');
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user && user.id) {
+      // Fetch Syllabus
+      fetch(`/api/syllabus/${user.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setSyllabusData(data.subjects);
+          }
+        })
+        .catch(console.error);
+
+      // Fetch Progress
+      fetch(`/api/progress/${user.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setSyllabusProgress(data.progress);
+          }
+        })
+        .catch(console.error);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (activeTab === 'Doubts') {
@@ -352,7 +396,7 @@ export default function App() {
     setSyllabusProgress(prev => {
       const newProgress = { ...prev };
       if (!newProgress[subject]) {
-        newProgress[subject] = new Array(UNIFIED_SYLLABUS[subject].length).fill(0);
+        newProgress[subject] = {};
       }
       newProgress[subject][index] = status;
       return newProgress;
@@ -360,14 +404,16 @@ export default function App() {
 
     // Save to backend if user is logged in
     if (user && user.id) {
+      const chapterId = getChapterId(subject, index);
+      if (!chapterId) return;
+
       try {
         await fetch('/api/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             userId: user.id,
-            subject,
-            chapterIndex: index,
+            chapterId,
             status
           })
         });
@@ -382,8 +428,10 @@ export default function App() {
   };
 
   const getSubjectProgress = (subject) => {
-    const total = UNIFIED_SYLLABUS[subject].length;
-    const completed = syllabusProgress[subject]?.filter(s => s === 2).length || 0;
+    const total = CURRENT_SYLLABUS[subject]?.length || 0;
+    if (total === 0) return 0;
+    const progress = syllabusProgress[subject] || {};
+    const completed = Object.values(progress).filter(s => s === 2).length;
     return Math.round((completed / total) * 100);
   };
 
@@ -466,7 +514,7 @@ export default function App() {
       }
     }, [examConfig, availableSubjects]);
 
-    const chapters = UNIFIED_SYLLABUS[pyqSubject] || [];
+    const chapters = CURRENT_SYLLABUS[pyqSubject] || [];
     const activeTheme = pyqSubjectThemes[pyqSubject];
 
     return (
@@ -1210,7 +1258,7 @@ export default function App() {
                 ))}
               </div>
               <div className="grid gap-3 max-w-4xl">
-                {UNIFIED_SYLLABUS[activeSubject]?.map((chapter, idx) => {
+                {CURRENT_SYLLABUS[activeSubject]?.map((chapter, idx) => {
                   const status = getChapterStatus(activeSubject, idx);
                   return (
                     <div key={idx} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl rounded-2xl border border-slate-200 dark:border-white/10 p-4 flex flex-col md:flex-row md:items-center justify-between gap-4 group hover:border-blue-300 dark:hover:border-blue-500/30 transition-all shadow-sm dark:shadow-lg dark:shadow-black/10">

@@ -24,6 +24,64 @@ app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
+// Unified Syllabus Dataset
+const UNIFIED_SYLLABUS = {
+  "Maths": [
+    "Sets, Relations and Functions", "Complex Numbers and Quadratic Equations", "Matrices and Determinants", 
+    "Permutations and Combinations", "Binomial Theorem", "Sequence and Series", 
+    "Limit, Continuity and Differentiability", "Integral Calculus", "Differential Equations", 
+    "Coordinate Geometry", "Three Dimensional Geometry", "Vector Algebra", 
+    "Statistics and Probability", "Trigonometry", "Mathematical Reasoning"
+  ],
+  "Physics": [
+    "Units and Measurements", "Kinematics", "Laws of Motion", "Work, Energy and Power", 
+    "Rotational Motion", "Gravitation", "Properties of Solids and Liquids", "Thermodynamics", 
+    "Kinetic Theory of Gases", "Oscillations and Waves", "Electrostatics", "Current Electricity", 
+    "Magnetism", "Electromagnetic Induction and AC", "Electromagnetic Waves", "Optics", 
+    "Dual Nature of Matter and Radiation", "Atoms and Nuclei", "Electronic Devices", "Experimental Skills"
+  ],
+  "Chemistry": [
+    "Some Basic Concepts of Chemistry", "Atomic Structure", "Chemical Bonding and Molecular Structure", 
+    "Chemical Thermodynamics", "Solutions", "Equilibrium", "Redox Reactions and Electrochemistry", 
+    "Chemical Kinetics", "Classification of Elements and Periodicity", "p-Block Elements", 
+    "d- and f-Block Elements", "Coordination Compounds", "Purification and Characterisation of Organic Compounds", 
+    "Some Basic Principles of Organic Chemistry", "Hydrocarbons", "Organic Compounds Containing Halogens", 
+    "Organic Compounds Containing Oxygen", "Organic Compounds Containing Nitrogen", "Biomolecules", 
+    "Principles Related to Practical Chemistry"
+  ],
+  "Biology": [
+    "Diversity in Living World", "Structural Organisation in Animals and Plants", "Cell Structure and Function", 
+    "Plant Physiology", "Reproduction", "Genetics and Evolution", "Ecology and Environment", 
+    "Human Physiology", "Biology and Human Welfare", "Biotechnology and Its Applications", "Experimental Skills"
+  ]
+};
+
+// Helper function to initialize syllabus for a new user
+async function initializeSyllabus(userId) {
+  // Check if syllabus already exists
+  const count = await prisma.subject.count({ where: { userId } });
+  if (count > 0) return;
+
+  for (const [subjectName, chapters] of Object.entries(UNIFIED_SYLLABUS)) {
+    const subject = await prisma.subject.create({
+      data: {
+        name: subjectName,
+        userId: userId,
+      }
+    });
+
+    for (let i = 0; i < chapters.length; i++) {
+        await prisma.chapter.create({
+            data: {
+                name: chapters[i],
+                subjectId: subject.id,
+                order: i
+            }
+        });
+    }
+  }
+}
+
 // API Endpoints
 
 // Google Login Endpoint
@@ -46,12 +104,15 @@ app.post('/api/auth/google', async (req, res) => {
           picture,
         },
       });
+      await initializeSyllabus(user.id);
     } else {
         // Update name/picture if they changed
         user = await prisma.user.update({
             where: { email },
             data: { name, picture },
         });
+        // Ensure syllabus exists (for old users migrating)
+        await initializeSyllabus(user.id);
     }
 
     res.json({ success: true, user });
@@ -82,6 +143,8 @@ app.post('/api/auth/signup', async (req, res) => {
         password: hashedPassword,
       },
     });
+
+    await initializeSyllabus(user.id);
 
     res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture } });
   } catch (error) {
@@ -119,22 +182,60 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// Get User Syllabus
+app.get('/api/syllabus/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId, 10);
+  try {
+    const subjects = await prisma.subject.findMany({
+      where: { userId },
+      include: {
+        chapters: {
+          orderBy: { order: 'asc' }
+        }
+      }
+    });
+
+    // If no syllabus found, try to initialize it
+    if (subjects.length === 0) {
+        await initializeSyllabus(userId);
+        const newSubjects = await prisma.subject.findMany({
+            where: { userId },
+            include: { chapters: { orderBy: { order: 'asc' } } }
+        });
+        return res.json({ success: true, subjects: newSubjects });
+    }
+
+    res.json({ success: true, subjects });
+  } catch (error) {
+    console.error('Error fetching syllabus:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Get User Progress
 app.get('/api/progress/:userId', async (req, res) => {
   const { userId } = req.params;
   try {
     const progressRecords = await prisma.progress.findMany({
       where: { userId: parseInt(userId, 10) },
+      include: {
+        chapter: {
+          include: { subject: true }
+        }
+      }
     });
     
     // Format back into the syllabusProgress structure expected by App.jsx
-    // { "Physics": [0, 1, ...], "Maths": [...] }
+    // But now we'll also need to support chapter IDs on frontend
     const formattedProgress = {};
     progressRecords.forEach((record) => {
-      if (!formattedProgress[record.subject]) {
-        formattedProgress[record.subject] = [];
+      const subjectName = record.chapter.subject.name;
+      const chapterIndex = record.chapter.order;
+      
+      if (!formattedProgress[subjectName]) {
+        formattedProgress[subjectName] = {};
       }
-      formattedProgress[record.subject][record.chapterIndex] = record.status;
+      formattedProgress[subjectName][chapterIndex] = record.status;
     });
 
     res.json({ success: true, progress: formattedProgress });
@@ -146,22 +247,25 @@ app.get('/api/progress/:userId', async (req, res) => {
 
 // Update Progress
 app.post('/api/progress', async (req, res) => {
-  const { userId, subject, chapterIndex, status } = req.body;
+  const { userId, chapterId, status } = req.body;
+  
+  if (!userId || !chapterId) {
+    return res.status(400).json({ success: false, message: 'Missing fields' });
+  }
+
   try {
     // Upsert progress
     await prisma.progress.upsert({
       where: {
-        userId_subject_chapterIndex: {
+        userId_chapterId: {
           userId: parseInt(userId, 10),
-          subject,
-          chapterIndex,
+          chapterId: parseInt(chapterId, 10),
         },
       },
       update: { status },
       create: {
         userId: parseInt(userId, 10),
-        subject,
-        chapterIndex,
+        chapterId: parseInt(chapterId, 10),
         status,
       },
     });
