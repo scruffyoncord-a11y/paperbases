@@ -183,6 +183,7 @@ export default function App() {
 
   // Resource Sharing State
   const [dbResources, setDbResources] = useState([]);
+  const [selectedResource, setSelectedResource] = useState(null);
   const [resourceFilter, setResourceFilter] = useState('All');
   const [isUploadingResource, setIsUploadingResource] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
@@ -263,7 +264,7 @@ export default function App() {
   }, [activeTab, resourceFilter]);
 
   useEffect(() => {
-    if (activeTab === 'Doubts') {
+    if (activeTab === 'Community' || activeTab === 'Doubts') {
       fetch('/api/doubts')
         .then(res => res.json())
         .then(data => {
@@ -409,6 +410,7 @@ export default function App() {
     const title = formData.get('title');
     const description = formData.get('description');
     const subject = formData.get('subject');
+    const tag = formData.get('tag'); // Get tag
     const file = formData.get('file');
 
     if (!file || !file.name) {
@@ -428,6 +430,7 @@ export default function App() {
                     title,
                     description,
                     subject,
+                    tag,
                     fileUrl: reader.result,
                     fileType: file.type.includes('pdf') ? 'pdf' : 'image'
                 })
@@ -444,6 +447,26 @@ export default function App() {
         setIsUploadingResource(false);
     };
     reader.readAsDataURL(file);
+  };
+
+  const handleLikeResource = async (resourceId) => {
+    if (!user) return alert('Please login to like this resource.');
+    try {
+        const res = await fetch(`/api/resources/${resourceId}/like`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: user.id })
+        });
+        const data = await res.json();
+        if (data.success) {
+            setDbResources(prev => prev.map(r => r.id === resourceId ? data.resource : r));
+            if (selectedResource?.id === resourceId) {
+                setSelectedResource(data.resource);
+            }
+        }
+    } catch(err) {
+        console.error(err);
+    }
   };
 
   const updateStatus = async (subject, index, status) => {
@@ -736,13 +759,18 @@ export default function App() {
                     <p>No resources found for this subject.</p>
                 </div>
             ) : (
-                dbResources.map((res) => (
-                    <div key={res.id} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm hover:border-blue-500 transition-all group">
+                dbResources.map((res) => {
+                    const hasLiked = res.likes?.some(l => l.userId === user?.id);
+                    return (
+                    <div key={res.id} onClick={(e) => { if(e.target.closest('button') || e.target.closest('a')) return; setSelectedResource(res); }} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm hover:border-blue-500 transition-all group cursor-pointer relative overflow-hidden">
                         <div className="flex items-start justify-between mb-4">
                             <div className={`p-3 rounded-xl ${getSubjectColor(res.subject)}`}>
                                 {res.fileType === 'pdf' ? <FileText size={20} /> : <ImageIcon size={20} />}
                             </div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{timeAgo(res.createdAt)}</span>
+                            <div className="flex flex-col items-end gap-1">
+                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{timeAgo(res.createdAt)}</span>
+                                {res.tag && <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 font-bold uppercase text-slate-600 dark:text-slate-300">{res.tag}</span>}
+                            </div>
                         </div>
                         <h4 className="font-bold text-slate-900 dark:text-white mb-1 group-hover:text-blue-500 transition-colors">{res.title}</h4>
                         <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 h-8">{res.description}</p>
@@ -753,12 +781,17 @@ export default function App() {
                                 </div>
                                 <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{res.user.name}</span>
                             </div>
-                            <a href={res.fileUrl} download={res.title} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 font-bold text-[10px] flex items-center gap-1">
-                                <UploadCloud size={14} /> DOWNLOAD
-                            </a>
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => handleLikeResource(res.id)} className={`flex items-center gap-1 text-[11px] font-black transition-colors ${hasLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
+                                    <ThumbsUp size={14} className={hasLiked ? 'fill-rose-500' : ''} /> {res._count?.likes || 0}
+                                </button>
+                                <a href={res.fileUrl} download={res.title} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 font-bold text-[10px] flex items-center gap-1">
+                                    <UploadCloud size={14} /> SAVE
+                                </a>
+                            </div>
                         </div>
                     </div>
-                ))
+                )})
             )}
           </div>
         )}
@@ -798,6 +831,17 @@ export default function App() {
                             </select>
                         </div>
                         <div>
+                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tag Category</label>
+                            <select name="tag" className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm text-slate-600 dark:text-slate-300">
+                                <option value="">None</option>
+                                <option value="Formula Sheet">Formula Sheet</option>
+                                <option value="PYQ Solutions">PYQ Solutions</option>
+                                <option value="Handwritten Notes">Handwritten Notes</option>
+                                <option value="Mind Map">Mind Map</option>
+                                <option value="Mocks">Mock Test</option>
+                            </select>
+                        </div>
+                        <div>
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Description</label>
                             <textarea name="description" rows="3" placeholder="What is inside this resource?" className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm resize-none"></textarea>
                         </div>
@@ -822,6 +866,46 @@ export default function App() {
                 </div>
             </div>
         )}
+
+        {/* PDF/Resource Viewer Modal */}
+        {selectedResource && (
+            <div className="fixed inset-0 z-[100] flex flex-col bg-slate-900/95 backdrop-blur-xl animate-in fade-in duration-300">
+                <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#0B0E14] shrink-0">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setSelectedResource(null)} className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors text-white"><X size={20} /></button>
+                        <div>
+                            <h3 className="text-xl font-black text-white">{selectedResource.title}</h3>
+                            <div className="flex items-center gap-2 mt-1">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest bg-blue-500/20 text-blue-400 border border-blue-500/30`}>{selectedResource.subject}</span>
+                                {selectedResource.tag && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest bg-white/10 text-slate-300">{selectedResource.tag}</span>}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={() => handleLikeResource(selectedResource.id)} 
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black transition-colors ${selectedResource.likes?.some(l => l.userId === user?.id) ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10'}`}
+                        >
+                            <ThumbsUp size={16} className={selectedResource.likes?.some(l => l.userId === user?.id) ? 'fill-rose-500' : ''} /> {selectedResource._count?.likes || 0}
+                        </button>
+                        <a href={selectedResource.fileUrl} download={selectedResource.title} className="flex items-center gap-2 px-6 py-2 rounded-xl bg-blue-600 text-white font-black hover:bg-blue-500 transition-colors shadow-lg">
+                            <UploadCloud size={16} /> Download Copy
+                        </a>
+                    </div>
+                </div>
+                <div className="flex-1 w-full bg-[#161923] p-4 md:p-8 flex items-center justify-center overflow-hidden">
+                    <div className="w-full max-w-5xl h-full bg-white rounded-xl overflow-hidden shadow-2xl relative border border-white/10">
+                        {selectedResource.fileType === 'pdf' ? (
+                            <embed src={selectedResource.fileUrl} type="application/pdf" className="w-full h-full" />
+                        ) : (
+                            <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
+                                <img src={selectedResource.fileUrl} alt={selectedResource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )}
       </section>
     );
   };
@@ -834,39 +918,50 @@ export default function App() {
         <div className="lg:col-span-2 space-y-6">
           <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-3xl p-6 shadow-sm dark:shadow-lg dark:shadow-black/20">
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-500 border border-blue-100 dark:border-blue-500/20"><User size={20} /></div>
-              <button className="flex-1 text-left bg-slate-50 dark:bg-[#0B0E14]/80 border border-slate-200 dark:border-[#333942] rounded-2xl px-5 py-3 text-sm text-slate-500 hover:bg-slate-100 transition-colors">Ask a doubt or share a resource...</button>
+              <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-500 border border-blue-100 dark:border-blue-500/20">
+                  {user?.picture ? <img src={user.picture} className="w-full h-full rounded-full" /> : <User size={20} />}
+              </div>
+              <button onClick={() => setShowAskDoubtModal(true)} className="flex-1 text-left bg-slate-50 dark:bg-[#0B0E14]/80 border border-slate-200 dark:border-[#333942] rounded-2xl px-5 py-3 text-sm text-slate-500 hover:bg-slate-100 transition-colors">Ask a doubt or share a resource...</button>
             </div>
             <div className="flex gap-4 border-t border-slate-100 dark:border-[#444b55] pt-4">
-              <button className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><FileText size={16} /> Question</button>
-              <button className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"><Book size={16} /> Resource</button>
+              <button onClick={() => setShowAskDoubtModal(true)} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><FileText size={16} /> Question</button>
+              <button onClick={() => {setActiveTab('Resources'); setShowUploadModal(true);}} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"><Book size={16} /> Resource</button>
               <button className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"><Star size={16} /> Achievement</button>
             </div>
           </div>
-          {[
-            { user: "Rahul S.", tag: "JEE Aspirant", time: "2h ago", title: "Can someone help with this Integration problem?", content: "I've tried using parts but getting stuck at the second step. Here is the equation.", likes: 24, comments: 8, category: "Maths", categoryColor: "bg-orange-50 text-orange-600 border border-orange-100 dark:bg-orange-500/10 dark:text-orange-400 dark:border-orange-500/20" },
-            { user: "Priya M.", tag: "Topper '24", time: "5h ago", title: "Full Inorganic Chemistry Revision Sheet (Handwritten)", content: "Compiled all reaction mechanisms from NCERT. Best for quick revision before mocks. Enjoy!", likes: 156, comments: 42, category: "Chemistry", categoryColor: "bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20" }
-          ].map((post, i) => (
-            <div key={i} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-3xl p-6 shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-blue-400 dark:hover:border-blue-500/30 transition-all cursor-pointer">
+          {doubts.length === 0 ? (
+            <div className="py-12 text-center text-slate-500">
+                <MessageSquare size={48} className="mx-auto mb-4 opacity-20" />
+                <p>No doubts yet. Be the first to ask!</p>
+            </div>
+          ) : doubts.map((post) => (
+            <div key={post.id} onClick={(e) => { if(!e.target.closest('button')) setSelectedDoubt(post); }} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-3xl p-6 shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-blue-400 dark:hover:border-blue-500/30 transition-all cursor-pointer">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-[#2d323c]/70 flex items-center justify-center text-slate-400 border border-transparent dark:border-[#444b55]"><User size={20} /></div>
+                  <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-[#2d323c]/70 flex items-center justify-center text-slate-400 border border-transparent dark:border-[#444b55]">
+                      {post.user.picture ? <img src={post.user.picture} className="w-full h-full rounded-full" /> : <User size={20} />}
+                  </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 dark:text-white text-sm">{post.user}</span>
-                      <span className="text-[10px] bg-slate-100 dark:bg-[#2d323c]/70 border border-transparent dark:border-[#444b55] text-slate-500 dark:text-slate-400 px-2 py-0.5 rounded font-bold uppercase tracking-tight">{post.tag}</span>
+                      <span className="font-bold text-slate-900 dark:text-white text-sm">{post.user.name}</span>
+                      {post.status === 'Resolved' && <span className="text-[10px] bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-transparent dark:border-emerald-500/20 px-2 py-0.5 rounded font-bold uppercase tracking-tight">Resolved</span>}
                     </div>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{post.time}</span>
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{timeAgo(post.createdAt)}</span>
                   </div>
                 </div>
-                <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${post.categoryColor}`}>{post.category}</span>
+                <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${getSubjectColor(post.subject)}`}>{post.subject}</span>
               </div>
               <h3 className="font-black text-slate-900 dark:text-white mb-2 leading-snug">{post.title}</h3>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 line-clamp-2">{post.content}</p>
+              {post.imageUrl && (
+                  <div className="mb-6 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 max-h-60">
+                      <img src={post.imageUrl} className="w-full object-cover" />
+                  </div>
+              )}
               <div className="flex items-center gap-6 pt-4 border-t border-slate-100 dark:border-[#444b55]">
-                <button className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><ThumbsUp size={16} /> {post.likes}</button>
-                <button className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><MessageCircle size={16} /> {post.comments}</button>
-                <button className="ml-auto text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><Share2 size={16} /></button>
+                <button className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><MessageCircle size={16} /> {post._count?.replies || 0} Replies</button>
+                {post.status === 'Resolved' && <span className="flex items-center gap-2 text-xs font-bold text-emerald-500"><CheckCircle2 size={16} /> Marked as solved</span>}
+                {user?.id === post.userId && <button onClick={() => handleDeleteDoubt(post.id)} className="ml-auto text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>}
               </div>
             </div>
           ))}

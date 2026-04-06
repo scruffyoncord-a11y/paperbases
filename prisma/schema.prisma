@@ -19,6 +19,7 @@ model User {
   doubts    Doubt[]
   replies   Reply[]
   resources Resource[]
+  resourceLikes ResourceLike[]
 }
 
 model Resource {
@@ -26,12 +27,24 @@ model Resource {
   title       String
   description String?
   subject     String   // e.g. "Physics", "Chemistry"
+  tag         String?  // e.g. "PYQ", "Formula Sheet"
   fileUrl     String
   fileType    String   // e.g. "pdf", "image"
   userId      Int
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  likes       ResourceLike[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model ResourceLike {
+  id         Int      @id @default(autoincrement())
+  resourceId Int
+  userId     Int
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceId, userId])
 }
 
 model Progress {

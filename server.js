@@ -379,7 +379,9 @@ app.get('/api/resources', async (req, res) => {
     const resources = await prisma.resource.findMany({
       where,
       include: {
-        user: { select: { id: true, name: true, picture: true } }
+        user: { select: { id: true, name: true, picture: true } },
+        _count: { select: { likes: true } },
+        likes: { select: { userId: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -392,7 +394,7 @@ app.get('/api/resources', async (req, res) => {
 
 // Create a new resource
 app.post('/api/resources', async (req, res) => {
-  const { userId, title, description, subject, fileUrl, fileType } = req.body;
+  const { userId, title, description, subject, fileUrl, fileType, tag } = req.body;
   if (!userId || !title || !subject || !fileUrl) {
     return res.status(400).json({ success: false, message: 'Missing required fields' });
   }
@@ -404,16 +406,57 @@ app.post('/api/resources', async (req, res) => {
         title,
         description,
         subject,
+        tag,
         fileUrl,
         fileType: fileType || 'pdf'
       },
       include: {
-        user: { select: { id: true, name: true, picture: true } }
+        user: { select: { id: true, name: true, picture: true } },
+        _count: { select: { likes: true } },
+        likes: { select: { userId: true } }
       }
     });
     res.json({ success: true, resource });
   } catch (error) {
     console.error('Error creating resource:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Toggle a like on a resource
+app.post('/api/resources/:id/like', async (req, res) => {
+  const resourceId = parseInt(req.params.id, 10);
+  const { userId } = req.body;
+
+  if (!userId) return res.status(400).json({ success: false, message: 'Missing userId' });
+
+  try {
+    const existingLike = await prisma.resourceLike.findUnique({
+      where: {
+        resourceId_userId: { resourceId, userId: parseInt(userId, 10) }
+      }
+    });
+
+    if (existingLike) {
+      await prisma.resourceLike.delete({ where: { id: existingLike.id } });
+    } else {
+      await prisma.resourceLike.create({
+        data: { resourceId, userId: parseInt(userId, 10) }
+      });
+    }
+
+    const updatedResource = await prisma.resource.findUnique({
+      where: { id: resourceId },
+      include: {
+        user: { select: { id: true, name: true, picture: true } },
+        _count: { select: { likes: true } },
+        likes: { select: { userId: true } }
+      }
+    });
+
+    res.json({ success: true, resource: updatedResource });
+  } catch (error) {
+    console.error('Error toggling like:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
