@@ -148,14 +148,36 @@ const getStatusText = (status, repliesCount) => {
   return 'Unanswered';
 };
 
-// Memoized so it NEVER re-renders unless the URL itself changes
+// Memoized so it NEVER re-renders unless the URL or scale changes
 // Custom PDF Viewer using pdf.js for highlighting support
-const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
+const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight, scale = 1.5 }) => {
   const containerRef = React.useRef(null);
   const [numPages, setNumPages] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
   const [selection, setSelection] = React.useState(null);
+
+  // Helper to apply stored highlights to the DOM
+  const applyHighlights = React.useCallback(() => {
+    if (!containerRef.current || highlights.length === 0) return;
+    
+    // Simple text-based matching for now
+    const pages = containerRef.current.querySelectorAll('.page-container');
+    highlights.forEach(hl => {
+        const page = pages[hl.pageIndex];
+        if (!page) return;
+        
+        const textLayer = page.querySelector('.textLayer');
+        if (!textLayer) return;
+        
+        const spans = textLayer.querySelectorAll('span');
+        spans.forEach(span => {
+            if (span.textContent.includes(hl.text) || hl.text.includes(span.textContent)) {
+                span.classList.add(`hl-${hl.color || 'yellow'}`, 'pdf-hl');
+            }
+        });
+    });
+  }, [highlights]);
 
   React.useEffect(() => {
     let isMounted = true;
@@ -186,7 +208,7 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
         
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale: 1.5 });
+          const viewport = page.getViewport({ scale });
           
           const pageWrapper = document.createElement('div');
           pageWrapper.className = 'relative mb-8 mx-auto shadow-2xl bg-white page-container min-h-[500px]';
@@ -216,6 +238,8 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
           container.appendChild(pageWrapper);
         }
         setIsLoading(false);
+        // Apply highlights after short delay to ensure text layer is ready
+        setTimeout(applyHighlights, 200);
       } catch (err) {
         console.error('PDF JS Error:', err);
         setError(true);
@@ -225,7 +249,7 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
 
     loadPdf();
     return () => { isMounted = false; };
-  }, [url]);
+  }, [url, scale]);
 
   // Handle text selection
   const handleMouseUp = () => {
@@ -267,28 +291,45 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
         
         {/* Floating Highlight Button */}
         {selection && (
-            <button 
-                onClick={() => {
-                    onHighlight(selection.text, selection.pageIndex);
-                    setSelection(null);
-                    window.getSelection().removeAllRanges();
-                }}
-                className="fixed bg-yellow-400 text-slate-900 px-4 py-2 rounded-full font-black text-xs shadow-2xl flex items-center gap-2 animate-in zoom-in-95 fade-in duration-200 z-[1001] border-2 border-white hover:scale-110 active:scale-95 transition-all"
+            <div 
+                className="fixed bg-white dark:bg-[#161923] p-1.5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex items-center gap-1 animate-in zoom-in-95 fade-in duration-200 z-[1001] border border-slate-200 dark:border-white/10"
                 style={{ left: selection.x, top: selection.y, transform: 'translateX(-50%)' }}
             >
-                <Highlighter size={14} /> HIGHLIGHT
-            </button>
+                {[
+                  { id: 'yellow', bg: 'bg-yellow-400', glow: 'shadow-[0_0_12px_rgba(250,204,21,0.5)]' },
+                  { id: 'green', bg: 'bg-emerald-400', glow: 'shadow-[0_0_12px_rgba(52,211,153,0.5)]' },
+                  { id: 'blue', bg: 'bg-sky-400', glow: 'shadow-[0_0_12px_rgba(56,189,248,0.5)]' },
+                  { id: 'pink', bg: 'bg-rose-400', glow: 'shadow-[0_0_12px_rgba(251,113,133,0.5)]' },
+                ].map((color) => (
+                  <button
+                    key={color.id}
+                    onClick={() => {
+                        onHighlight(selection.text, selection.pageIndex, color.id);
+                        setSelection(null);
+                        window.getSelection().removeAllRanges();
+                    }}
+                    className={`w-8 h-8 rounded-xl ${color.bg} ${color.glow} hover:scale-110 active:scale-90 transition-all flex items-center justify-center text-slate-900 shadow-sm`}
+                    title={`Highlight in ${color.id}`}
+                  >
+                    <Highlighter size={14} />
+                  </button>
+                ))}
+            </div>
         )}
 
-        {/* CSS for Text Layer and Highlights */}
+        {/* Visual Highlight Styles */}
         <style dangerouslySetInnerHTML={{ __html: `
             .textLayer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; color: transparent; cursor: text; pointer-events: auto; z-index: 2; }
             .textLayer span { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
             .page-container { transition: transform 0.2s ease; z-index: 1; }
-            .page-container:hover { transform: scale(1.005); }
+            .page-container:hover { transform: scale(1.002); }
             
-            /* Visual Highlight Overlay */
-            .pdf-hl { background-color: rgba(250, 204, 21, 0.4); border-radius: 2px; }
+            /* Visual Highlight Overlays */
+            .hl-yellow { background-color: rgba(250, 204, 21, 0.4); }
+            .hl-green { background-color: rgba(52, 211, 153, 0.4); }
+            .hl-blue { background-color: rgba(56, 189, 248, 0.4); }
+            .hl-pink { background-color: rgba(251, 113, 133, 0.4); }
+            .pdf-hl { border-radius: 2px; }
         `}} />
     </div>
   );
@@ -301,6 +342,7 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
   const likeCount = resource._count?.likes || 0;
   const [highlights, setHighlights] = React.useState([]);
   const [showHighlightSidebar, setShowHighlightSidebar] = React.useState(false);
+  const [zoomScale, setZoomScale] = React.useState(1.5);
 
   React.useEffect(() => {
     if (resource.id && user?.id) {
@@ -311,12 +353,12 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
     }
   }, [resource.id, user?.id]);
 
-  const handleHighlight = async (text, pageIndex) => {
+  const handleHighlight = async (text, pageIndex, color = 'yellow') => {
     try {
         const res = await fetch('/api/highlights', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ userId: user.id, resourceId: resource.id, text, pageIndex })
+            body: JSON.stringify({ userId: user.id, resourceId: resource.id, text, pageIndex, color })
         });
         const data = await res.json();
         if (data.success) {
@@ -347,7 +389,29 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
       {/* Header */}
       <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-4 md:px-6 py-3 md:py-4 flex items-center gap-3 shrink-0 shadow-sm z-10">
         <button onClick={onClose} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-black text-sm transition-all border border-slate-200 dark:border-white/10 shrink-0"><ArrowLeft size={18} /> <span className="hidden sm:inline">Back</span></button>
-        <h2 className="flex-1 text-sm md:text-base lg:text-lg font-black text-slate-900 dark:text-white truncate text-center">{resource.title}</h2>
+        
+        {/* Zoom Controls */}
+        <div className="hidden md:flex items-center bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 p-1 shrink-0">
+            <button 
+                onClick={() => setZoomScale(Math.max(0.5, zoomScale - 0.25))}
+                className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all"
+                title="Zoom Out"
+            >
+                <TrendingDown size={18} />
+            </button>
+            <span className="px-3 text-xs font-black text-slate-600 dark:text-slate-400 min-w-[60px] text-center">
+                {Math.round(zoomScale * 100)}%
+            </span>
+            <button 
+                onClick={() => setZoomScale(Math.min(3, zoomScale + 0.25))}
+                className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all"
+                title="Zoom In"
+            >
+                <TrendingUp size={18} />
+            </button>
+        </div>
+
+        <h2 className="flex-1 text-sm md:text-base lg:text-lg font-black text-slate-900 dark:text-white truncate text-center mx-2">{resource.title}</h2>
         <div className="flex items-center gap-2 shrink-0">
           <button 
             onClick={() => setShowHighlightSidebar(!showHighlightSidebar)}
@@ -366,7 +430,7 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
         {/* Main Viewer */}
         <div className="flex-1 overflow-hidden relative">
             {resource.fileType === 'pdf' ? (
-                <PdfViewer url={resource.fileUrl} title={resource.title} highlights={highlights} onHighlight={handleHighlight} />
+                <PdfViewer url={resource.fileUrl} title={resource.title} highlights={highlights} onHighlight={handleHighlight} scale={zoomScale} />
             ) : (
                 <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
                     <img src={resource.fileUrl} alt={resource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
@@ -391,7 +455,12 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
                     {highlights.map(h => (
                         <div key={h.id} className="bg-slate-50 dark:bg-[#0B0E14] p-3 rounded-xl border border-slate-200 dark:border-white/5 group">
                             <div className="flex justify-between items-center mb-2">
-                                <span className="text-[9px] font-black text-yellow-600 dark:text-yellow-400 uppercase tracking-widest bg-yellow-500/10 px-1.5 py-0.5 rounded">Page {h.pageIndex + 1}</span>
+                                <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${
+                                    h.color === 'green' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' :
+                                    h.color === 'blue' ? 'text-sky-600 dark:text-sky-400 bg-sky-500/10' :
+                                    h.color === 'pink' ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10' :
+                                    'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10'
+                                }`}>Page {h.pageIndex + 1}</span>
                                 <button onClick={() => deleteHighlight(h.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12} /></button>
                             </div>
                             <p className="text-xs font-medium text-slate-700 dark:text-slate-300 line-clamp-3 leading-relaxed italic">"{h.text}"</p>
@@ -2108,7 +2177,12 @@ export default function App() {
                                 <div key={h.id} className="bg-white dark:bg-[#161923] p-5 rounded-2xl border border-slate-200 dark:border-[#333942] shadow-sm flex flex-col gap-4 group">
                                     <div className="flex justify-between items-center">
                                         <div className="flex items-center gap-2">
-                                            <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.5)]"></div>
+                                            <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${
+                                                h.color === 'green' ? 'bg-emerald-400 shadow-emerald-400/50' : 
+                                                h.color === 'blue' ? 'bg-sky-400 shadow-sky-400/50' : 
+                                                h.color === 'pink' ? 'bg-rose-400 shadow-rose-400/50' : 
+                                                'bg-yellow-400 shadow-yellow-400/50'
+                                            }`}></div>
                                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{h.resource?.title || 'Resource'} — Page {h.pageIndex + 1}</span>
                                         </div>
                                         <button 
@@ -2129,7 +2203,12 @@ export default function App() {
                                             <Trash2 size={16} />
                                         </button>
                                     </div>
-                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 italic border-l-4 border-yellow-400/50 pl-4 py-1 leading-relaxed bg-yellow-400/5 dark:bg-yellow-400/10 rounded-r-lg">"{h.text}"</p>
+                                    <p className={`text-sm font-medium italic border-l-4 pl-4 py-1.5 leading-relaxed rounded-r-lg transition-colors ${
+                                        h.color === 'green' ? 'text-emerald-900 dark:text-emerald-50 border-emerald-400/50 bg-emerald-400/5 dark:bg-emerald-400/10' :
+                                        h.color === 'blue' ? 'text-sky-900 dark:text-sky-50 border-sky-400/50 bg-sky-400/5 dark:bg-sky-400/10' :
+                                        h.color === 'pink' ? 'text-rose-900 dark:text-rose-50 border-rose-400/50 bg-rose-400/5 dark:bg-rose-400/10' :
+                                        'text-slate-700 dark:text-slate-300 border-yellow-400/50 bg-yellow-400/5 dark:bg-yellow-400/10'
+                                    }`}>"{h.text}"</p>
                                     <button 
                                         onClick={() => {
                                             const res = dbResources.find(r => r.id === h.resourceId);
