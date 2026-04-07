@@ -21,8 +21,8 @@ const CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '61443326668-rd9i38u50mjj3k0cq
 const client = new OAuth2Client(CLIENT_ID);
 
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ limit: '10mb', extended: true }));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Unified Syllabus Dataset
 const UNIFIED_SYLLABUS = {

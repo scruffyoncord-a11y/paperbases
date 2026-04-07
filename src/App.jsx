@@ -587,13 +587,17 @@ export default function App() {
             });
             const data = await res.json();
             if (data.success) {
-                setDbResources([data.resource, ...dbResources]);
+                setDbResources(prev => [data.resource, ...prev]);
                 setResourceFile(null);
                 setShowUploadModal(false);
                 e.target.reset();
+                alert('Resource published successfully!');
+            } else {
+                alert('Upload failed: ' + (data.message || 'Unknown error'));
             }
         } catch (err) {
             console.error(err);
+            alert('Upload error: ' + err.message);
         }
         setIsUploadingResource(false);
     };
