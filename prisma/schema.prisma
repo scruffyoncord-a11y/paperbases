@@ -40,6 +40,10 @@ model Resource {
   likes       ResourceLike[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  @@index([subject])
+  @@index([createdAt])
+  @@index([userId])
 }
 
 model ResourceLike {
@@ -102,6 +106,10 @@ model Doubt {
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   replies   Reply[]
+
+  @@index([subject])
+  @@index([createdAt])
+  @@index([userId])
 }
 
 model Reply {

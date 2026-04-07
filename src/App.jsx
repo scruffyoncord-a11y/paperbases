@@ -326,6 +326,23 @@ export default function App() {
     }
   }, [user?.id]);
 
+  // Prefetch resources and doubts on mount so they're instant when tabs are clicked
+  useEffect(() => {
+    if (user?.id) {
+      // Prefetch resources
+      fetch('/api/resources')
+        .then(res => res.json())
+        .then(data => { if (data.success) setDbResources(data.resources); })
+        .catch(console.error);
+      // Prefetch doubts
+      fetch('/api/doubts')
+        .then(res => res.json())
+        .then(data => { if (data.success) setDoubts(data.doubts); })
+        .catch(console.error);
+    }
+  }, [user?.id]);
+
+  // Refresh resources when tab/filter changes (data already available from prefetch)
   useEffect(() => {
     if (activeTab === 'Resources') {
         const url = resourceFilter === 'All' ? '/api/resources' : `/api/resources?subject=${resourceFilter}`;
@@ -338,6 +355,7 @@ export default function App() {
     }
   }, [activeTab, resourceFilter]);
 
+  // Refresh doubts when tab changes (data already available from prefetch)
   useEffect(() => {
     if (activeTab === 'Community' || activeTab === 'Doubts') {
       fetch('/api/doubts')
