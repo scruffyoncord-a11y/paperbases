@@ -59,8 +59,19 @@ import {
   BarChart3,
   Trash2,
   ExternalLink,
+  Highlighter,
+  ArrowUpRight,
   Image as ImageIcon
 } from 'lucide-react';
+
+import * as pdfjsLib from 'pdfjs-dist';
+
+// Configure pdf.js worker globally for the whole app
+// This uses the Vite-compatible worker loading strategy
+pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.js',
+  import.meta.url
+).toString();
 
 // Unified Syllabus Dataset
 const UNIFIED_SYLLABUS = {
@@ -149,26 +160,11 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
   React.useEffect(() => {
     let isMounted = true;
     const loadPdf = async () => {
-      // Wait for library to load if needed
-      if (!window.pdfjsLib) {
-          let retries = 0;
-          while (!window.pdfjsLib && retries < 50) {
-              await new Promise(r => setTimeout(r, 100));
-              retries++;
-          }
-      }
-      if (!window.pdfjsLib) {
-          setError(true);
-          return;
-      }
-
-      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-      
       setIsLoading(true);
       setError(false);
       try {
         let pdfData = url;
-        // Handle Base64 strings correctly for pdf.js
+        // Handle Base64 strings correctly
         if (url.startsWith('data:application/pdf;base64,')) {
             const base64Data = url.split(',')[1];
             const binaryString = window.atob(base64Data);
@@ -179,7 +175,7 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
             pdfData = { data: bytes };
         }
 
-        const loadingTask = window.pdfjsLib.getDocument(pdfData);
+        const loadingTask = pdfjsLib.getDocument(pdfData);
         const pdf = await loadingTask.promise;
         if (!isMounted) return;
         setNumPages(pdf.numPages);
@@ -208,7 +204,7 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
           const textLayer = document.createElement('div');
           textLayer.className = 'absolute inset-0 textLayer opacity-20 hover:opacity-100 transition-opacity';
           const textContent = await page.getTextContent();
-          window.pdfjsLib.renderTextLayer({
+          pdfjsLib.renderTextLayer({
             textContent,
             container: textLayer,
             viewport,
