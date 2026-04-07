@@ -229,7 +229,7 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
   const likeCount = resource._count?.likes || 0;
 
   return (
-    <div className="fixed inset-0 z-[200] bg-[#f8fafc] dark:bg-[#0f1219] flex flex-col">
+    <div className="fixed inset-0 z-[999] bg-[#f8fafc] dark:bg-[#0f1219] flex flex-col">
       {/* Header */}
       <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-4 md:px-6 py-3 md:py-4 flex items-center gap-3 shrink-0 shadow-sm z-10">
         
@@ -1151,25 +1151,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Upload Modal — isolated component so typing doesn't lose focus */}
-        {showUploadModal && (
-            <UploadResourceModal
-                onClose={() => setShowUploadModal(false)}
-                onUpload={handleUploadResource}
-                syllabusMode={syllabusMode}
-                modeSubjects={modeSubjects}
-            />
-        )}
-
-        {/* Resource Viewer — isolated component prevents PDF reload on like */}
-        {selectedResource && (
-            <ResourceViewerModal
-                resource={selectedResource}
-                user={user}
-                onClose={() => setSelectedResource(null)}
-                onLike={handleLikeResource}
-            />
-        )}
       </section>
     );
   };
@@ -2103,92 +2084,6 @@ export default function App() {
             </div>
           )}
 
-          {selectedDoubt && (
-            <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-2 sm:p-4">
-              <div className="bg-white dark:bg-[#161923] rounded-3xl w-full max-w-3xl shadow-2xl border border-slate-200 dark:border-[#333942] relative flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-[#333942] flex justify-between items-center bg-slate-50 dark:bg-[#0B0E14]">
-                  <div className="flex gap-2 items-center">
-                    <span className={`text-[9px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full ${getSubjectColor(selectedDoubt.subject)}`}>{selectedDoubt.subject}</span>
-                    <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded border ${getStatusColor(selectedDoubt.status, selectedDoubt._count?.replies || selectedDoubt.replies?.length)}`}>{getStatusText(selectedDoubt.status, selectedDoubt._count?.replies || selectedDoubt.replies?.length)}</span>
-                  </div>
-                  <div className="flex gap-2">
-                    {user?.id === selectedDoubt.userId && (
-                      <>
-                        {selectedDoubt.status !== 'Resolved' && (
-                          <button onClick={() => {
-                            handleResolveDoubt();
-                            // Logic for solving: mark as resolved
-                          }} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg transition">Mark Resolved</button>
-                        )}
-                        <button onClick={() => handleDeleteDoubt(selectedDoubt.id)} className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
-                          <Trash2 size={12} /> Delete
-                        </button>
-                      </>
-                    )}
-                    <button onClick={() => setSelectedDoubt(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"><X size={20} /></button>
-                  </div>
-                </div>
-                
-                <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 bg-white dark:bg-[#161923] no-scrollbar">
-                  <div>
-                    <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-4 leading-snug">{selectedDoubt.title}</h2>
-                    {selectedDoubt.imageUrl && (
-                      <div className="mb-6 rounded-2xl overflow-hidden border border-slate-200 dark:border-[#333942] bg-slate-100 dark:bg-black/20">
-                        <img src={selectedDoubt.imageUrl} alt="Doubt Context" className="w-full h-auto max-h-[400px] object-contain mx-auto" />
-                      </div>
-                    )}
-                    <p className="text-sm font-medium text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{selectedDoubt.content}</p>
-                    <div className="flex items-center gap-2 mt-6">
-                      <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-[#2d323c] overflow-hidden flex items-center justify-center text-slate-500 border border-slate-200 dark:border-[#444b55]">
-                        {selectedDoubt.user?.picture ? <img src={selectedDoubt.user.picture} alt="" className="w-full h-full object-cover" /> : <User size={14} strokeWidth={3} />}
-                      </div>
-                      <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedDoubt.user?.name || 'Anonymous'} <span className="text-slate-400 dark:text-slate-500 font-medium ml-1 flex items-center gap-1"><Clock size={12}/>{timeAgo(selectedDoubt.createdAt)}</span></span>
-                    </div>
-                  </div>
-
-                  <div className="border-t border-slate-100 dark:border-[#333942] pt-6">
-                    <h3 className="text-sm font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2"><MessageSquare size={16} /> {selectedDoubt.replies ? selectedDoubt.replies.length : 0} Replies</h3>
-                    
-                    {!selectedDoubt.replies && (
-                        <div className="flex justify-center p-8"><div className="w-6 h-6 border-2 border-slate-300 border-t-blue-500 rounded-full animate-spin"></div></div>
-                    )}
-                    
-                    {selectedDoubt.replies?.length === 0 && (
-                        <p className="text-sm text-slate-500 dark:text-slate-400 font-medium bg-slate-50 dark:bg-[#0B0E14] p-4 rounded-xl text-center">No replies yet. Can you help?</p>
-                    )}
-
-                    <div className="space-y-4">
-                        {selectedDoubt.replies?.map((reply, idx) => (
-                            <div key={idx} className="bg-slate-50 dark:bg-[#1C1F29]/50 p-4 rounded-2xl border border-slate-200 dark:border-[#333942]">
-                                <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-4 whitespace-pre-wrap">{reply.content}</p>
-                                <div className="flex items-center gap-2">
-                                  <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-[#2d323c] overflow-hidden flex items-center justify-center text-slate-500">
-                                    {reply.user?.picture ? <img src={reply.user.picture} alt="" className="w-full h-full object-cover" /> : <User size={10} strokeWidth={3} />}
-                                  </div>
-                                  <span className="text-xs font-bold text-slate-900 dark:text-white flex-1">{reply.user?.name || 'Anonymous'} <span className="text-slate-400 dark:text-slate-500 font-medium ml-1">• {timeAgo(reply.createdAt)}</span></span>
-                                  {user?.id === reply.userId && (
-                                    <button onClick={() => handleDeleteReply(reply.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-1">
-                                      <Trash2 size={12} />
-                                    </button>
-                                  )}
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-[#333942] bg-slate-50 dark:bg-[#0B0E14]">
-                    <form onSubmit={handleReplyDoubt} className="flex gap-3">
-                        <input type="text" name="content" required placeholder="Type your reply..." disabled={isSubmittingDoubt} className="flex-1 bg-white dark:bg-[#161923] border border-slate-200 dark:border-[#333942] rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition-all text-sm font-medium text-slate-900 dark:text-white disabled:opacity-50" />
-                        <button type="submit" disabled={isSubmittingDoubt} className="bg-blue-600 text-white px-5 rounded-xl text-sm font-bold shadow-[0_4px_15px_rgba(37,99,235,0.2)] hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center min-w-[100px]">
-                            {isSubmittingDoubt ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Reply'}
-                        </button>
-                    </form>
-                </div>
-              </div>
-            </div>
-          )}
 
           {showEditModal && (
             <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
@@ -2257,6 +2152,105 @@ export default function App() {
           .custom-scrollbar::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
         `}} />
       </div>
+
+      {/* Global Overlays - High z-index to cover sidebar and main content */}
+      {showUploadModal && (
+        <UploadResourceModal
+          onClose={() => setShowUploadModal(false)}
+          onUpload={handleUploadResource}
+          syllabusMode={syllabusMode}
+          modeSubjects={modeSubjects}
+        />
+      )}
+
+      {selectedResource && (
+        <ResourceViewerModal
+          resource={selectedResource}
+          user={user}
+          onClose={() => setSelectedResource(null)}
+          onLike={handleLikeResource}
+        />
+      )}
+
+      {selectedDoubt && (
+        <div className="fixed inset-0 bg-slate-900/40 dark:bg-black/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-2 sm:p-4">
+          <div className="bg-white dark:bg-[#161923] rounded-3xl w-full max-w-3xl shadow-2xl border border-slate-200 dark:border-[#333942] relative flex flex-col max-h-[90vh] overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-5 sm:p-6 border-b border-slate-100 dark:border-[#333942] flex justify-between items-center bg-slate-50 dark:bg-[#0B0E14]">
+              <div className="flex gap-2 items-center">
+                <span className={`text-[9px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full ${getSubjectColor(selectedDoubt.subject)}`}>{selectedDoubt.subject}</span>
+                <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded border ${getStatusColor(selectedDoubt.status, selectedDoubt._count?.replies || selectedDoubt.replies?.length)}`}>{getStatusText(selectedDoubt.status, selectedDoubt._count?.replies || selectedDoubt.replies?.length)}</span>
+              </div>
+              <div className="flex gap-2">
+                {user?.id === selectedDoubt.userId && (
+                  <>
+                    {selectedDoubt.status !== 'Resolved' && (
+                      <button onClick={handleResolveDoubt} className="text-xs font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-500/10 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 px-3 py-1.5 rounded-lg transition">Mark Resolved</button>
+                    )}
+                    <button onClick={() => handleDeleteDoubt(selectedDoubt.id)} className="text-xs font-bold text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-500/10 hover:bg-rose-100 dark:hover:bg-rose-500/20 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                      <Trash2 size={12} /> Delete
+                    </button>
+                  </>
+                )}
+                <button onClick={() => setSelectedDoubt(null)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 transition-colors"><X size={20} /></button>
+              </div>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6 bg-white dark:bg-[#161923] no-scrollbar">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white mb-4 leading-snug">{selectedDoubt.title}</h2>
+                {selectedDoubt.imageUrl && (
+                  <div className="mb-6 rounded-2xl overflow-hidden border border-slate-200 dark:border-[#333942] bg-slate-100 dark:bg-black/20">
+                    <img src={selectedDoubt.imageUrl} alt="Doubt Context" className="w-full h-auto max-h-[400px] object-contain mx-auto" />
+                  </div>
+                )}
+                <p className="text-sm font-medium text-slate-600 dark:text-slate-300 whitespace-pre-wrap">{selectedDoubt.content}</p>
+                <div className="flex items-center gap-2 mt-6">
+                  <div className="w-8 h-8 rounded-full bg-slate-100 dark:bg-[#2d323c] overflow-hidden flex items-center justify-center text-slate-500 border border-slate-200 dark:border-[#444b55]">
+                    {selectedDoubt.user?.picture ? <img src={selectedDoubt.user.picture} alt="" className="w-full h-full object-cover" /> : <User size={14} strokeWidth={3} />}
+                  </div>
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">{selectedDoubt.user?.name || 'Anonymous'} <span className="text-slate-400 dark:text-slate-500 font-medium ml-1 flex items-center gap-1"><Clock size={12}/>{timeAgo(selectedDoubt.createdAt)}</span></span>
+                </div>
+              </div>
+
+              <div className="border-t border-slate-100 dark:border-[#333942] pt-6">
+                <h3 className="text-sm font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2"><MessageSquare size={16} /> {selectedDoubt.replies ? selectedDoubt.replies.length : 0} Replies</h3>
+                
+                {selectedDoubt.replies?.length === 0 && (
+                    <p className="text-sm text-slate-500 dark:text-slate-400 font-medium bg-slate-50 dark:bg-[#0B0E14] p-4 rounded-xl text-center">No replies yet. Can you help?</p>
+                )}
+
+                <div className="space-y-4">
+                    {selectedDoubt.replies?.map((reply, idx) => (
+                        <div key={idx} className="bg-slate-50 dark:bg-[#1C1F29]/50 p-4 rounded-2xl border border-slate-200 dark:border-[#333942]">
+                            <p className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-4 whitespace-pre-wrap">{reply.content}</p>
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-[#2d323c] overflow-hidden flex items-center justify-center text-slate-500">
+                                {reply.user?.picture ? <img src={reply.user.picture} alt="" className="w-full h-full object-cover" /> : <User size={10} strokeWidth={3} />}
+                              </div>
+                              <span className="text-xs font-bold text-slate-900 dark:text-white flex-1">{reply.user?.name || 'Anonymous'} <span className="text-slate-400 dark:text-slate-500 font-medium ml-1">• {timeAgo(reply.createdAt)}</span></span>
+                              {user?.id === reply.userId && (
+                                <button onClick={() => handleDeleteReply(reply.id)} className="text-slate-400 hover:text-rose-500 transition-colors p-1">
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                        </div>
+                    ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="p-4 sm:p-6 border-t border-slate-100 dark:border-[#333942] bg-slate-50 dark:bg-[#0B0E14]">
+                <form onSubmit={handleReplyDoubt} className="flex gap-3">
+                    <input type="text" name="content" required placeholder="Type your reply..." disabled={isSubmittingDoubt} className="flex-1 bg-white dark:bg-[#161923] border border-slate-200 dark:border-[#333942] rounded-xl px-4 py-3 outline-none focus:border-blue-500 transition-all text-sm font-medium text-slate-900 dark:text-white disabled:opacity-50" />
+                    <button type="submit" disabled={isSubmittingDoubt} className="bg-blue-600 text-white px-5 rounded-xl text-sm font-bold shadow-[0_4px_15px_rgba(37,99,235,0.2)] hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center min-w-[100px]">
+                        {isSubmittingDoubt ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : 'Reply'}
+                    </button>
+                </form>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
