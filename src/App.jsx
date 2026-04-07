@@ -322,8 +322,8 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
       <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-4 md:px-6 py-3 md:py-4 flex items-center gap-3 shrink-0 shadow-sm z-10">
         <button onClick={onClose} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-black text-sm transition-all border border-slate-200 dark:border-white/10 shrink-0"><ArrowLeft size={18} /> <span className="hidden sm:inline">Back</span></button>
         
-  // Note: react-pdf-highlighter handles its own zoom/scroll scaling flawlessly via CSS and scroll hooks, 
-  // so we optionally removed the manual zoom control buttons. But we will hide them if they were here.
+  {/* Note: react-pdf-highlighter handles its own zoom/scroll scaling flawlessly via CSS and scroll hooks, 
+      so we optionally removed the manual zoom control buttons. But we will hide them if they were here. */}
 
         <h2 className="flex-1 text-sm md:text-base lg:text-lg font-black text-slate-900 dark:text-white truncate text-center mx-2">{resource.title}</h2>
         <div className="flex items-center gap-2 shrink-0">
