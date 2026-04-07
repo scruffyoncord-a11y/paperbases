@@ -166,7 +166,7 @@ const Latex = ({ children, inline = true }) => {
 
   // Wrap in delimiters if not already present, but ONLY if it looks like LaTeX/Math
   const content = String(children || "");
-  const hasMathCues = /[\\]|[\^]|[_]|[{]|[}]|[$]/.test(content);
+  const hasMathCues = /[\\]|[\^]|[_]|[{]|[}]|[$]|[=]|[\≠]|[>]|[<]/.test(content);
   const needsWrapping = hasMathCues && !content.includes('\\(') && !content.includes('\\[') && !content.includes('$');
   const wrapped = needsWrapping ? (inline ? `\\(${content}\\)` : `\\[${content}\\]`) : content;
 
@@ -2195,12 +2195,15 @@ export default function App() {
               ) : (
                 <div className="space-y-4">
                     {highlights.length === 0 ? (
-                        <div className="py-20 text-center bg-white/50 dark:bg-[#161923]/30 rounded-3xl border border-dashed border-slate-200 dark:border-[#333942]">
-                            <Highlighter size={48} className="mx-auto mb-4 opacity-20" />
-                            <p className="text-slate-500">Your highlights will appear here once you bookmark lines in PDFs.</p>
+                        <div className="py-24 text-center bg-slate-50/50 dark:bg-white/5 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-white/10 animate-in fade-in zoom-in duration-700">
+                            <div className="w-20 h-20 bg-white dark:bg-[#0B0E14] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-100 dark:border-white/5">
+                                <Highlighter size={40} className="text-blue-500 opacity-40" />
+                            </div>
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white mb-2">No highlights yet</h3>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto">Your saved snippets and equations from PDFs will appear here for quick review.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
                             {highlights.map((h) => (
                                 <div key={h.id} className="bg-white dark:bg-[#161923] p-5 rounded-2xl border border-slate-200 dark:border-[#333942] shadow-sm flex flex-col gap-4 group">
                                     <div className="flex justify-between items-center">
@@ -2231,12 +2234,14 @@ export default function App() {
                                             <Trash2 size={16} />
                                         </button>
                                     </div>
-                                    <p className={`text-sm font-medium italic border-l-4 pl-4 py-1.5 leading-relaxed rounded-r-lg transition-colors ${
+                                    <div className={`text-sm font-medium border-l-4 pl-4 py-1.5 leading-relaxed rounded-r-lg transition-colors overflow-x-auto custom-scrollbar ${
                                         h.color === 'green' ? 'text-emerald-900 dark:text-emerald-50 border-emerald-400/50 bg-emerald-400/5 dark:bg-emerald-400/10' :
                                         h.color === 'blue' ? 'text-sky-900 dark:text-sky-50 border-sky-400/50 bg-sky-400/5 dark:bg-sky-400/10' :
                                         h.color === 'pink' ? 'text-rose-900 dark:text-rose-50 border-rose-400/50 bg-rose-400/5 dark:bg-rose-400/10' :
                                         'text-slate-700 dark:text-slate-300 border-yellow-400/50 bg-yellow-400/5 dark:bg-yellow-400/10'
-                                    }`}>"{h.text}"</p>
+                                    }`}>
+                                        <Latex>{h.text}</Latex>
+                                    </div>
                                     <button 
                                         onClick={() => {
                                             const res = dbResources.find(r => r.id === h.resourceId);
