@@ -131,7 +131,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     await initializeSyllabus(user.id);
 
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture } });
+    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points } });
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -160,7 +160,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid credentials' });
     }
 
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture } });
+    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points } });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -179,7 +179,7 @@ app.get('/api/auth/validate/:userId', async (req, res) => {
     if (!user) {
       return res.json({ success: false, message: 'User not found' });
     }
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture } });
+    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points } });
   } catch (error) {
     console.error('Error validating user:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -481,12 +481,28 @@ app.post('/api/resources/:id/like', async (req, res) => {
       }
     });
 
+    const resourceInfo = await prisma.resource.findUnique({ where: { id: resourceId } });
+
     if (existingLike) {
       await prisma.resourceLike.delete({ where: { id: existingLike.id } });
+      if (resourceInfo && resourceInfo.userId !== parseInt(userId, 10)) {
+        // Decrement uploader's points (if they exist and it's not self-like)
+        await prisma.user.update({
+          where: { id: resourceInfo.userId },
+          data: { points: { decrement: 1 } }
+        });
+      }
     } else {
       await prisma.resourceLike.create({
         data: { resourceId, userId: parseInt(userId, 10) }
       });
+      if (resourceInfo && resourceInfo.userId !== parseInt(userId, 10)) {
+        // Increment uploader's points
+        await prisma.user.update({
+          where: { id: resourceInfo.userId },
+          data: { points: { increment: 1 } }
+        });
+      }
     }
 
     const updatedResource = await prisma.resource.findUnique({

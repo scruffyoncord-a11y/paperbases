@@ -17,6 +17,7 @@ model User {
   updatedAt DateTime   @updatedAt
   streak    Int        @default(0)
   focusTime Int        @default(0) // minutes
+  points    Int        @default(0) // gamification points for resources
   progress  Progress[]
   doubts    Doubt[]
   replies   Reply[]

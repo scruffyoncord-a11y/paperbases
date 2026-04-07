@@ -990,16 +990,14 @@ export default function App() {
                         >
                             <ThumbsUp size={16} className={selectedResource.likes?.some(l => l.userId === user?.id) ? 'fill-rose-500' : ''} /> {selectedResource._count?.likes || 0}
                         </button>
+                        <a href={selectedResource.fileUrl} download={selectedResource.title} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl bg-blue-600 text-white text-xs md:text-sm font-black hover:bg-blue-500 transition-colors shadow-sm">
+                            Download <UploadCloud size={16} />
+                        </a>
                     </div>
                 </div>
 
                 {/* Body below header */}
                 <div className="flex-1 w-full overflow-y-auto flex flex-col items-center py-6 md:py-10 px-4 gap-6 custom-scrollbar">
-                    
-                    {/* The Blue Button from Screenshot 2 */}
-                    <a href={selectedResource.fileUrl} download={selectedResource.title} className="bg-blue-500 text-white font-bold px-6 py-2.5 rounded-lg flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm text-sm">
-                        Normal PDF <UploadCloud size={16} />
-                    </a>
 
                     {/* Viewer Container */}
                     <div className="w-full max-w-5xl h-[85vh] bg-white rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative">
@@ -1367,7 +1365,7 @@ export default function App() {
             </div>
           </div>
           <div className="grid grid-cols-3 gap-4 pt-8 border-t border-slate-100 dark:border-[#444b55]">
-            <div className="text-center"><div className="text-xl font-black text-slate-900 dark:text-white">0</div><div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Points</div></div>
+            <div className="text-center"><div className="text-xl font-black text-slate-900 dark:text-white">{user?.points || 0}</div><div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Points</div></div>
             <div className="text-center border-x border-slate-100 dark:border-[#444b55]"><div className="text-xl font-black text-slate-900 dark:text-white">0</div><div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Level</div></div>
             <div className="text-center"><div className="text-xl font-black text-slate-900 dark:text-white">-</div><div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">Rank</div></div>
           </div>
