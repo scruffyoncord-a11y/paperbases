@@ -267,7 +267,14 @@ app.post('/api/progress', async (req, res) => {
 app.get('/api/doubts', async (req, res) => {
   try {
     const doubts = await prisma.doubt.findMany({
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        subject: true,
+        title: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
         user: { select: { id: true, name: true, picture: true } },
         _count: { select: { replies: true } }
       },
@@ -416,16 +423,36 @@ app.get('/api/resources', async (req, res) => {
     const where = subject && subject !== 'All' ? { subject } : {};
     const resources = await prisma.resource.findMany({
       where,
-      include: {
-        user: { select: { id: true, name: true, picture: true } },
-        _count: { select: { likes: true } },
-        likes: { select: { userId: true } }
+      select: {
+          id: true, title: true, description: true, subject: true, tag: true, fileType: true, userId: true, createdAt: true,
+          user: { select: { id: true, name: true, picture: true } },
+          _count: { select: { likes: true } },
+          likes: { select: { userId: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
     res.json({ success: true, resources });
   } catch (error) {
     console.error('Error fetching resources:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get single resource (Full data with fileUrl)
+app.get('/api/resources/:id', async (req, res) => {
+  try {
+    const resource = await prisma.resource.findUnique({
+      where: { id: parseInt(req.params.id, 10) },
+      include: {
+        user: { select: { id: true, name: true, picture: true } },
+        _count: { select: { likes: true } },
+        likes: { select: { userId: true } }
+      }
+    });
+    if (!resource) return res.status(404).json({ success: false, message: 'Resource not found' });
+    res.json({ success: true, resource });
+  } catch (error) {
+    console.error('Error fetching resource details:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

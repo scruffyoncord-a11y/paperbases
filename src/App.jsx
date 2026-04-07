@@ -154,6 +154,28 @@ const getStatusText = (status, repliesCount) => {
   return 'Unanswered';
 };
 
+// LaTeX Renderer Component
+const Latex = ({ children, inline = true }) => {
+  const nodeRef = React.useRef(null);
+
+  React.useEffect(() => {
+    if (nodeRef.current && window.MathJax && window.MathJax.typesetPromise) {
+      window.MathJax.typesetPromise([nodeRef.current]).catch(err => console.error("MathJax error:", err));
+    }
+  }, [children]);
+
+  // Wrap in delimiters if not already present
+  const content = children || "";
+  const needsWrapping = !content.includes('\\(') && !content.includes('\\[') && !content.includes('$');
+  const wrapped = needsWrapping ? (inline ? `\\(${content}\\)` : `\\[${content}\\]`) : content;
+
+  return (
+    <span ref={nodeRef} className="latex-content">
+      {wrapped}
+    </span>
+  );
+};
+
 // Custom PDF Viewer using react-pdf-highlighter for pro-level annotation
 const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
   const [isLoading, setIsLoading] = React.useState(true);
@@ -246,16 +268,20 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
        </PdfLoader>
        <style dangerouslySetInnerHTML={{ __html: `
             .PdfHighlighter { background-color: #1c1f26; }
-            .Highlight__part { opacity: 0.4; }
+            .Highlight__part { 
+                opacity: 0.8 !important; 
+                border-bottom: 2px solid rgba(0,0,0,0.2);
+                box-shadow: 0 0 8px rgba(255,255,255,0.1);
+            }
             .hl-yellow .Highlight__part { background-color: rgba(250, 204, 21, 1); }
             .hl-green .Highlight__part { background-color: rgba(52, 211, 153, 1); }
             .hl-blue .Highlight__part { background-color: rgba(56, 189, 248, 1); }
             .hl-pink .Highlight__part { background-color: rgba(251, 113, 133, 1); }
             
-            .hl-yellow .AreaHighlight { border: 2px solid rgba(250, 204, 21, 1); background-color: rgba(250, 204, 21, 0.4); }
-            .hl-green .AreaHighlight { border: 2px solid rgba(52, 211, 153, 1); background-color: rgba(52, 211, 153, 0.4); }
-            .hl-blue .AreaHighlight { border: 2px solid rgba(56, 189, 248, 1); background-color: rgba(56, 189, 248, 0.4); }
-            .hl-pink .AreaHighlight { border: 2px solid rgba(251, 113, 133, 1); background-color: rgba(251, 113, 133, 0.4); }
+            .hl-yellow .AreaHighlight { border: 3px solid rgba(250, 204, 21, 1); background-color: rgba(250, 204, 21, 0.5); box-shadow: 0 0 15px rgba(250,204,21,0.3); }
+            .hl-green .AreaHighlight { border: 3px solid rgba(52, 211, 153, 1); background-color: rgba(52, 211, 153, 0.5); box-shadow: 0 0 15px rgba(52,211,153,0.3); }
+            .hl-blue .AreaHighlight { border: 3px solid rgba(56, 189, 248, 1); background-color: rgba(56, 189, 248, 0.5); box-shadow: 0 0 15px rgba(56,189,248,0.3); }
+            .hl-pink .AreaHighlight { border: 3px solid rgba(251, 113, 133, 1); background-color: rgba(251, 113, 133, 0.5); box-shadow: 0 0 15px rgba(251,113,133,0.3); }
        `}} />
     </div>
   );
@@ -263,12 +289,32 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
 
 // ---- Isolated Resource Viewer Modal ----
 // Kept outside App so likes/state changes don't remount PdfViewer
-function ResourceViewerModal({ resource, user, onClose, onLike }) {
+function ResourceViewerModal({ resource: initialResource, user, onClose, onLike }) {
+  const [resource, setResource] = React.useState(initialResource);
+  const [isDataLoading, setIsDataLoading] = React.useState(!initialResource.fileUrl);
+  const [highlights, setHighlights] = React.useState([]);
+  const [pendingSelection, setPendingSelection] = React.useState(null);
   const hasLiked = resource.likes?.some(l => l.userId === user?.id);
   const likeCount = resource._count?.likes || 0;
-  const [highlights, setHighlights] = React.useState([]);
-  const [showHighlightSidebar, setShowHighlightSidebar] = React.useState(false);
-  const [zoomScale, setZoomScale] = React.useState(1.5);
+
+  // Performance: Lazy-load full resource data only when opened
+  React.useEffect(() => {
+    if (!resource.fileUrl && resource.id) {
+        setIsDataLoading(true);
+        fetch(`/api/resources/${resource.id}`)
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    setResource(data.resource);
+                    setIsDataLoading(false);
+                }
+            })
+            .catch(err => {
+                console.error(err);
+                setIsDataLoading(false);
+            });
+    }
+  }, [resource.id]);
 
   React.useEffect(() => {
     if (resource.id && user?.id) {
@@ -282,7 +328,7 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
   const handleHighlight = async (content, position, color = 'yellow') => {
     try {
         const textToSave = content.text || 'Area selection (Image/Diagram)';
-        const pageIndex = position.boundingRect.pageNumber - 1; // Convert 1-based pageNumber to 0-based index
+        const pageIndex = position.boundingRect.pageNumber - 1;
 
         const res = await fetch('/api/highlights', {
             method: 'POST',
@@ -300,6 +346,7 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
         const data = await res.json();
         if (data.success) {
             setHighlights([data.highlight, ...highlights]);
+            setPendingSelection(null);
         }
     } catch(err) {
         console.error(err);
@@ -321,23 +368,21 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
     }
   };
 
+  const COLORS = [
+    { id: 'yellow', bg: 'bg-yellow-400', glow: 'shadow-[0_0_12px_rgba(250,204,21,0.5)]' },
+    { id: 'green', bg: 'bg-emerald-400', glow: 'shadow-[0_0_12px_rgba(52,211,153,0.5)]' },
+    { id: 'blue', bg: 'bg-sky-400', glow: 'shadow-[0_0_12px_rgba(56,189,248,0.5)]' },
+    { id: 'pink', bg: 'bg-rose-400', glow: 'shadow-[0_0_12px_rgba(251,113,133,0.5)]' },
+  ];
+
   return (
     <div className="fixed inset-0 z-[999] bg-[#f8fafc] dark:bg-[#0f1219] flex flex-col">
       {/* Header */}
       <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-4 md:px-6 py-3 md:py-4 flex items-center gap-3 shrink-0 shadow-sm z-10">
         <button onClick={onClose} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-black text-sm transition-all border border-slate-200 dark:border-white/10 shrink-0"><ArrowLeft size={18} /> <span className="hidden sm:inline">Back</span></button>
         
-  {/* Note: react-pdf-highlighter handles its own zoom/scroll scaling flawlessly via CSS and scroll hooks, 
-      so we optionally removed the manual zoom control buttons. But we will hide them if they were here. */}
-
         <h2 className="flex-1 text-sm md:text-base lg:text-lg font-black text-slate-900 dark:text-white truncate text-center mx-2">{resource.title}</h2>
         <div className="flex items-center gap-2 shrink-0">
-          <button 
-            onClick={() => setShowHighlightSidebar(!showHighlightSidebar)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs md:text-sm font-black transition-all border ${showHighlightSidebar ? 'bg-yellow-400 text-slate-900 border-yellow-500' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-yellow-400'}`}
-          >
-            <Highlighter size={15} /> <span>{highlights.length}</span>
-          </button>
           <button onClick={() => onLike(resource.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs md:text-sm font-black transition-all border ${hasLiked ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-rose-300 hover:text-rose-500'}`}>
             <ThumbsUp size={15} className={hasLiked ? 'fill-rose-500' : ''} /> <span>{likeCount}</span>
           </button>
@@ -348,8 +393,20 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
       <div className="flex-1 flex overflow-hidden">
         {/* Main Viewer */}
         <div className="flex-1 overflow-hidden relative">
-            {resource.fileType === 'pdf' ? (
-                <PdfViewer url={resource.fileUrl} title={resource.title} highlights={highlights} onHighlight={handleHighlight} />
+            {isDataLoading ? (
+                <div className="w-full h-full flex flex-col items-center justify-center bg-[#0B0E14] text-slate-400 gap-4">
+                    <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin"></div>
+                    <p className="font-black animate-pulse">Loading Document High-Fidelity Data...</p>
+                </div>
+            ) : resource.fileType === 'pdf' ? (
+                <PdfViewer 
+                    url={resource.fileUrl} 
+                    title={resource.title} 
+                    highlights={highlights} 
+                    onHighlight={(content, position) => {
+                        setPendingSelection({ content, position });
+                    }} 
+                />
             ) : (
                 <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
                     <img src={resource.fileUrl} alt={resource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
@@ -357,40 +414,84 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
             )}
         </div>
 
-        {/* Highlights Sidebar */}
-        {showHighlightSidebar && (
-            <div className="w-80 bg-white dark:bg-[#161923] border-l border-slate-200 dark:border-white/10 flex flex-col animate-in slide-in-from-right duration-300">
-                <div className="p-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
-                    <h3 className="font-black text-sm text-slate-900 dark:text-white uppercase tracking-wider">Document Highlights</h3>
-                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full">{highlights.length}</span>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
-                    {highlights.length === 0 && (
-                        <div className="text-center py-10">
-                            <Highlighter size={32} className="mx-auto mb-2 opacity-10" />
-                            <p className="text-xs text-slate-500 italic">No highlights yet. Select text in the PDF to add one!</p>
+        {/* Highlights Sidebar (Permanent) */}
+        <div className="w-96 bg-white dark:bg-[#161923] border-l border-slate-200 dark:border-white/10 flex flex-col shrink-0 overflow-hidden">
+            <div className="p-5 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/5">
+                <h3 className="font-black text-xs text-slate-900 dark:text-white uppercase tracking-[0.2em]">Study Dashboard</h3>
+            </div>
+
+            {/* Selection Context & Color Picker (Conditional) */}
+            {pendingSelection && (
+                <div className="p-5 border-b border-slate-100 dark:border-white/10 bg-blue-500/5 animate-in slide-in-from-top duration-300">
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-500/10 px-2 py-1 rounded-md">New Selection</span>
+                        <button onClick={() => setPendingSelection(null)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"><X size={16} /></button>
+                    </div>
+                    <div className="bg-white dark:bg-[#0B0E14] p-3 rounded-xl border border-blue-500/20 mb-4 max-h-32 overflow-y-auto no-scrollbar">
+                        <p className="text-xs italic text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                            <Latex>{pendingSelection.content.text || "Area selection"}</Latex>
+                        </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-bold text-slate-400 uppercase">Apply Color:</span>
+                        <div className="flex gap-2">
+                            {COLORS.map((color) => (
+                                <button
+                                    key={color.id}
+                                    onClick={() => handleHighlight(pendingSelection.content, pendingSelection.position, color.id)}
+                                    className={`w-8 h-8 rounded-xl ${color.bg} ${color.glow} hover:scale-110 active:scale-90 transition-all flex items-center justify-center text-slate-900`}
+                                >
+                                    <Highlighter size={14} />
+                                </button>
+                            ))}
                         </div>
-                    )}
-                    {highlights.map(h => (
-                        <div key={h.id} className="bg-slate-50 dark:bg-[#0B0E14] p-3 rounded-xl border border-slate-200 dark:border-white/5 group">
-                            <div className="flex justify-between items-center mb-2">
-                                <span className={`text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded ${
-                                    h.color === 'green' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' :
-                                    h.color === 'blue' ? 'text-sky-600 dark:text-sky-400 bg-sky-500/10' :
-                                    h.color === 'pink' ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10' :
-                                    'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10'
-                                }`}>Page {h.pageIndex + 1}</span>
-                                <button onClick={() => deleteHighlight(h.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12} /></button>
-                            </div>
-                            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 line-clamp-3 leading-relaxed italic">"{h.text}"</p>
-                        </div>
-                    ))}
+                    </div>
                 </div>
-                <div className="p-4 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-white/5">
-                    <p className="text-[10px] text-slate-500 font-medium leading-normal">Selected snippets are automatically stored in your <strong className="text-blue-500">Study Vault</strong> for later review.</p>
+            )}
+
+            <div className="p-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
+                <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest">Saved Highlights</h4>
+                <span className="text-[10px] font-bold text-blue-500 bg-blue-500/10 px-2.5 py-0.5 rounded-full">{highlights.length}</span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar bg-slate-50/30 dark:bg-transparent">
+                {highlights.length === 0 && !pendingSelection && (
+                    <div className="text-center py-16 px-6">
+                        <div className="w-16 h-16 bg-slate-100 dark:bg-white/5 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-slate-200 dark:border-white/5">
+                            <Highlighter size={28} className="text-slate-300 dark:text-slate-600" />
+                        </div>
+                        <p className="text-xs text-slate-500 font-bold mb-1 uppercase tracking-tighter">No annotations found</p>
+                        <p className="text-[10px] text-slate-400 leading-relaxed">Select text in the PDF to start your active study session.</p>
+                    </div>
+                )}
+                {highlights.map(h => (
+                    <div key={h.id} className="bg-white dark:bg-[#0B0E14] p-4 rounded-2xl border border-slate-200 dark:border-white/5 group shadow-sm hover:shadow-md transition-all active:scale-[0.98]">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                                h.color === 'green' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' :
+                                h.color === 'blue' ? 'text-sky-600 dark:text-sky-400 bg-sky-500/10' :
+                                h.color === 'pink' ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10' :
+                                'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10'
+                            }`}>Page {h.pageIndex + 1}</span>
+                            <button onClick={() => deleteHighlight(h.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12} /></button>
+                        </div>
+                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-relaxed">
+                            <Latex>{h.text}</Latex>
+                        </p>
+                    </div>
+                ))}
+            </div>
+            
+            <div className="p-5 bg-white dark:bg-black/20 border-t border-slate-100 dark:border-white/5">
+                <div className="flex items-start gap-3 bg-blue-500/10 p-3 rounded-xl border border-blue-500/10">
+                    <Sparkles size={16} className="text-blue-500 shrink-0 mt-0.5" />
+                    <div>
+                        <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold leading-normal uppercase tracking-wider mb-1">Study Vault Active</p>
+                        <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">Snippets are synced with your global dashboard for review.</p>
+                    </div>
                 </div>
             </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -660,36 +761,43 @@ export default function App() {
     }
   }, [user?.id]);
 
-  // Prefetch resources and doubts on mount so they're instant when tabs are clicked
+  // Prefetch resources and doubts on mount (caching logic)
   useEffect(() => {
     if (user?.id) {
-      // Prefetch resources
-      fetch('/api/resources')
-        .then(res => res.json())
-        .then(data => { if (data.success) setDbResources(data.resources); })
-        .catch(console.error);
-      // Prefetch doubts
-      fetch('/api/doubts')
-        .then(res => res.json())
-        .then(data => { if (data.success) setDoubts(data.doubts); })
-        .catch(console.error);
-      // Prefetch highlights
-      fetch(`/api/highlights/${user.id}`)
-        .then(res => res.json())
-        .then(data => { if (data.success) setHighlights(data.highlights); })
-        .catch(console.error);
+      // Only prefetch if we don't have data yet
+      if (dbResources.length === 0) {
+        fetch('/api/resources')
+            .then(res => res.json())
+            .then(data => { if (data.success) setDbResources(data.resources); })
+            .catch(console.error);
+      }
+      
+      if (doubts.length === 0) {
+        fetch('/api/doubts')
+            .then(res => res.json())
+            .then(data => { if (data.success) setDoubts(data.doubts); })
+            .catch(console.error);
+      }
+
+      if (highlights.length === 0) {
+        fetch(`/api/highlights/${user.id}`)
+            .then(res => res.json())
+            .then(data => { if (data.success) setHighlights(data.highlights); })
+            .catch(console.error);
+      }
     }
   }, [user?.id]);
 
-  // Refresh resources when tab/filter changes (data already available from prefetch)
+  // Refresh resources when filter changes (ignore tab changes for performance if already prefetched)
   useEffect(() => {
-    if (activeTab === 'Resources') {
-        const url = resourceFilter === 'All' ? '/api/resources' : `/api/resources?subject=${resourceFilter}`;
+    if (activeTab === 'Resources' && dbResources.length > 0) {
+        // If we are just opening the tab and already have data, don't re-fetch unless it's a specific filter
+        if (resourceFilter === 'All') return; 
+
+        const url = `/api/resources?subject=${resourceFilter}`;
         fetch(url)
             .then(res => res.json())
-            .then(data => {
-                if (data.success) setDbResources(data.resources);
-            })
+            .then(data => { if (data.success) setDbResources(data.resources); })
             .catch(console.error);
     }
   }, [activeTab, resourceFilter]);
