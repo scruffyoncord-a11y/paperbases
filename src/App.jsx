@@ -970,41 +970,44 @@ export default function App() {
             </div>
         )}
 
-        {/* PDF/Resource Viewer Modal */}
+        {/* Full-Page style Resource Viewer inside Main */}
         {selectedResource && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 md:p-8 animate-in fade-in duration-300">
-                <div className="bg-white dark:bg-[#161923] w-full max-w-6xl h-full rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col animate-in slide-in-from-bottom-8 duration-500">
-                    <div className="p-4 md:p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center shrink-0">
-                        <div className="flex items-center gap-4">
-                            <button onClick={() => setSelectedResource(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors text-slate-900 dark:text-white font-bold border border-slate-200 dark:border-white/10">
-                                <ArrowLeft size={18} /> Back
-                            </button>
-                            <div>
-                                <h3 className="text-lg font-black text-slate-900 dark:text-white line-clamp-1">{selectedResource.title}</h3>
-                                <div className="flex items-center gap-2 mt-0.5">
-                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">{selectedResource.subject}</span>
-                                    {selectedResource.tag && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400">{selectedResource.tag}</span>}
-                                </div>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button 
-                                onClick={() => handleLikeResource(selectedResource.id)} 
-                                className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-black transition-colors ${selectedResource.likes?.some(l => l.userId === user?.id) ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10 hover:bg-slate-200'}`}
-                            >
-                                <ThumbsUp size={16} className={selectedResource.likes?.some(l => l.userId === user?.id) ? 'fill-rose-500' : ''} /> {selectedResource._count?.likes || 0}
-                            </button>
-                            <a href={selectedResource.fileUrl} download={selectedResource.title} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white font-black hover:bg-blue-500 transition-colors shadow-lg text-xs">
-                                <UploadCloud size={16} /> <span className="hidden sm:inline">Download</span>
-                            </a>
-                        </div>
+            <div className="absolute inset-0 z-[100] bg-[#f8fafc] dark:bg-[#0f1219] flex flex-col animate-in slide-in-from-right-8 duration-300">
+                {/* Header matching Screenshot 2 style */}
+                <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-6 py-4 flex flex-wrap items-center justify-between shrink-0 shadow-sm z-10 gap-4">
+                    <button onClick={() => setSelectedResource(null)} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-bold transition-colors">
+                        <ArrowLeft size={20} /> Back
+                    </button>
+                    
+                    <h2 className="text-base md:text-lg lg:text-xl font-black text-slate-900 dark:text-white flex-1 text-center px-4 line-clamp-1">
+                        {selectedResource.title}
+                    </h2>
+                    
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <button 
+                            onClick={() => handleLikeResource(selectedResource.id)} 
+                            className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs md:text-sm font-black transition-colors ${selectedResource.likes?.some(l => l.userId === user?.id) ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10 hover:bg-slate-200'}`}
+                        >
+                            <ThumbsUp size={16} className={selectedResource.likes?.some(l => l.userId === user?.id) ? 'fill-rose-500' : ''} /> {selectedResource._count?.likes || 0}
+                        </button>
                     </div>
-                    <div className="flex-1 w-full bg-[#f8fafc] dark:bg-[#0B0E14] relative">
+                </div>
+
+                {/* Body below header */}
+                <div className="flex-1 w-full overflow-y-auto flex flex-col items-center py-6 md:py-10 px-4 gap-6 custom-scrollbar">
+                    
+                    {/* The Blue Button from Screenshot 2 */}
+                    <a href={selectedResource.fileUrl} download={selectedResource.title} className="bg-blue-500 text-white font-bold px-6 py-2.5 rounded-lg flex items-center gap-2 hover:bg-blue-600 transition-colors shadow-sm text-sm">
+                        Normal PDF <UploadCloud size={16} />
+                    </a>
+
+                    {/* Viewer Container */}
+                    <div className="w-full max-w-5xl h-[85vh] bg-white rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative">
                         {selectedResource.fileType === 'pdf' ? (
                             <AdobePdfViewer url={selectedResource.fileUrl} title={selectedResource.title} />
                         ) : (
-                            <div className="w-full h-full overflow-auto flex items-center justify-center p-8">
-                                <img src={selectedResource.fileUrl} alt={selectedResource.title} className="max-w-full h-auto rounded-lg shadow-2xl border border-slate-200 dark:border-white/10" />
+                            <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
+                                <img src={selectedResource.fileUrl} alt={selectedResource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
                             </div>
                         )}
                     </div>
