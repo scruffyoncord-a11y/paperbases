@@ -547,6 +547,82 @@ app.put('/api/doubts/:id/resolve', async (req, res) => {
   }
 });
 
+
+// --- Highlighting API ---
+
+// Create a new highlight
+app.post('/api/highlights', async (req, res) => {
+  const { userId, resourceId, text, pageIndex, color } = req.body;
+  if (!userId || !resourceId || !text) {
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  try {
+    const highlight = await prisma.highlight.create({
+      data: {
+        userId: parseInt(userId, 10),
+        resourceId: parseInt(resourceId, 10),
+        text,
+        pageIndex: parseInt(pageIndex, 10) || 0,
+        color: color || 'yellow'
+      },
+      include: {
+        resource: { select: { title: true } }
+      }
+    });
+    res.json({ success: true, highlight });
+  } catch (error) {
+    console.error('Error creating highlight:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get all highlights for a user
+app.get('/api/highlights/:userId', async (req, res) => {
+  const userId = parseInt(req.params.userId, 10);
+  const resourceId = req.query.resourceId ? parseInt(req.query.resourceId, 10) : undefined;
+
+  try {
+    const whereClause = { userId };
+    if (resourceId) {
+      whereClause.resourceId = resourceId;
+    }
+
+    const highlights = await prisma.highlight.findMany({
+      where: whereClause,
+      include: {
+        resource: { select: { title: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+    res.json({ success: true, highlights });
+  } catch (error) {
+    console.error('Error fetching highlights:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Delete a highlight
+app.delete('/api/highlights/:id', async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  const { userId } = req.body; // Basic auth check
+
+  try {
+    const existing = await prisma.highlight.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Highlight not found' });
+    
+    if (existing.userId !== parseInt(userId, 10)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    await prisma.highlight.delete({ where: { id } });
+    res.json({ success: true, message: 'Highlight deleted' });
+  } catch (error) {
+    console.error('Error deleting highlight:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // --- Timetable & Goals API ---
 
 // Get Timetable Data

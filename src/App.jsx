@@ -138,86 +138,140 @@ const getStatusText = (status, repliesCount) => {
 };
 
 // Memoized so it NEVER re-renders unless the URL itself changes
-const PdfViewer = React.memo(({ url, title }) => {
-  const [blobUrl, setBlobUrl] = React.useState(null);
+// Custom PDF Viewer using pdf.js for highlighting support
+const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
+  const containerRef = React.useRef(null);
+  const [numPages, setNumPages] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
+  const [selection, setSelection] = React.useState(null);
 
   React.useEffect(() => {
-    setIsLoading(true);
-    setError(false);
-    if (url && url.startsWith('data:application/pdf;base64,')) {
+    let isMounted = true;
+    const loadPdf = async () => {
+      // Set worker source for pdf.js
+      window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+      
+      setIsLoading(true);
+      setError(false);
       try {
-        const base64Data = url.split(',')[1];
-        const binaryString = window.atob(base64Data);
-        const bytes = new Uint8Array(binaryString.length);
-        for (let i = 0; i < binaryString.length; i++) {
-          bytes[i] = binaryString.charCodeAt(i);
+        const loadingTask = window.pdfjsLib.getDocument(url);
+        const pdf = await loadingTask.promise;
+        if (!isMounted) return;
+        setNumPages(pdf.numPages);
+        
+        // Render all pages
+        const container = containerRef.current;
+        container.innerHTML = ''; // Clear previous
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const viewport = page.getViewport({ scale: 1.5 });
+          
+          const pageWrapper = document.createElement('div');
+          pageWrapper.className = 'relative mb-8 mx-auto shadow-2xl bg-white page-container';
+          pageWrapper.style.width = `${viewport.width}px`;
+          pageWrapper.style.height = `${viewport.height}px`;
+          pageWrapper.dataset.page = i - 1; // 0-indexed
+          
+          // Canvas layer
+          const canvas = document.createElement('canvas');
+          canvas.className = 'absolute inset-0';
+          const context = canvas.getContext('2d');
+          canvas.height = viewport.height;
+          canvas.width = viewport.width;
+          await page.render({ canvasContext: context, viewport }).promise;
+          
+          // Text layer (for selection)
+          const textLayer = document.createElement('div');
+          textLayer.className = 'absolute inset-0 textLayer opacity-20 hover:opacity-100 transition-opacity';
+          const textContent = await page.getTextContent();
+          window.pdfjsLib.renderTextLayer({
+            textContent,
+            container: textLayer,
+            viewport,
+            enhanceTextSelection: true
+          });
+          
+          pageWrapper.appendChild(canvas);
+          pageWrapper.appendChild(textLayer);
+          container.appendChild(pageWrapper);
         }
-        const blob = new Blob([bytes], { type: 'application/pdf' });
-        const newUrl = URL.createObjectURL(blob);
-        setBlobUrl(newUrl);
         setIsLoading(false);
-        return () => URL.revokeObjectURL(newUrl);
       } catch (err) {
-        console.error('Failed to process PDF data:', err);
+        console.error('PDF JS Error:', err);
         setError(true);
         setIsLoading(false);
       }
-    } else if (url) {
-      setBlobUrl(url);
-      setIsLoading(false);
-    }
+    };
+
+    loadPdf();
+    return () => { isMounted = false; };
   }, [url]);
 
-  if (error) {
-    return (
-        <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-slate-50 dark:bg-[#0f1219]">
-            <div className="w-20 h-20 bg-rose-50 dark:bg-rose-500/10 rounded-3xl flex items-center justify-center text-rose-600 dark:text-rose-500 mb-6 border border-rose-100 dark:border-rose-500/20">
-                <Info size={40} />
-            </div>
-            <h4 className="text-slate-900 dark:text-white font-black text-lg mb-2">Corrupted PDF Data</h4>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 max-w-xs mx-auto">The PDF data appears to be missing or corrupted.</p>
-        </div>
-    );
-  }
+  // Handle text selection
+  const handleMouseUp = () => {
+    const sel = window.getSelection();
+    const text = sel.toString().trim();
+    if (text && text.length > 2) {
+      const range = sel.getRangeAt(0);
+      const rect = range.getBoundingClientRect();
+      
+      // Find which page we are on
+      let pageIndex = 0;
+      let node = range.startContainer;
+      while (node && !node.classList?.contains('page-container')) {
+        node = node.parentElement;
+      }
+      if (node) pageIndex = parseInt(node.dataset.page, 10);
+
+      setSelection({
+        text,
+        pageIndex,
+        x: rect.left + rect.width / 2,
+        y: rect.top + window.scrollY - 40
+      });
+    } else {
+      setSelection(null);
+    }
+  };
+
+  if (error) return <div className="p-20 text-center text-rose-500 font-bold">Failed to load PDF engine.</div>;
 
   return (
-    <div className="w-full h-full relative bg-slate-50 dark:bg-[#0f1219]">
-      {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm z-10">
-          <div className="flex flex-col items-center gap-4">
-            <Sparkles className="animate-spin text-blue-600" size={32} />
-            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Preparing Document...</span>
-          </div>
+    <div className="w-full h-full relative bg-[#1c1f26] overflow-y-auto no-scrollbar" onMouseUp={handleMouseUp}>
+        {isLoading && (
+            <div className="sticky top-0 inset-x-0 h-1 bg-blue-600 animate-pulse z-50"></div>
+        )}
+        <div ref={containerRef} className="p-4 md:p-8 flex flex-col items-center">
+            {/* Pages rendered here */}
         </div>
-      )}
-      {blobUrl && (
-        <object
-          data={`${blobUrl}#toolbar=1&navpanes=1&scrollbar=1`}
-          type="application/pdf"
-          className="w-full h-full"
-          onLoad={() => setIsLoading(false)}
-          onError={() => { setError(true); setIsLoading(false); }}
-        >
-          <embed src={blobUrl} type="application/pdf" className="w-full h-full shadow-inner" />
-          <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-              <div className="w-20 h-20 bg-blue-50 dark:bg-blue-500/10 rounded-3xl flex items-center justify-center text-blue-600 dark:text-blue-500 mb-6 border border-blue-100 dark:border-blue-500/20 shadow-sm">
-                  <FileText size={40} />
-              </div>
-              <h4 className="text-slate-900 dark:text-white font-black text-lg mb-2">PDF Display Unavailable</h4>
-              <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 max-w-xs mx-auto">Your browser does not support embedded PDF viewing.</p>
-              <div className="flex flex-col gap-3 w-full max-w-xs">
-                  <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-blue-600 text-white font-black shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all">
-                      <ExternalLink size={20} /> Open in New Tab
-                  </a>
-                  <a href={url} download={title || "Document.pdf"} className="flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-slate-100 dark:bg-white/5 text-slate-800 dark:text-slate-200 font-black hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/10">
-                      <UploadCloud size={20} /> Download PDF
-                  </a>
-              </div>
-          </div>
-        </object>
-      )}
+        
+        {/* Floating Highlight Button */}
+        {selection && (
+            <button 
+                onClick={() => {
+                    onHighlight(selection.text, selection.pageIndex);
+                    setSelection(null);
+                    window.getSelection().removeAllRanges();
+                }}
+                className="fixed bg-yellow-400 text-slate-900 px-4 py-2 rounded-full font-black text-xs shadow-2xl flex items-center gap-2 animate-in zoom-in-95 fade-in duration-200 z-[1001] border-2 border-white hover:scale-110 active:scale-95 transition-all"
+                style={{ left: selection.x, top: selection.y, transform: 'translateX(-50%)' }}
+            >
+                <Highlighter size={14} /> HIGHLIGHT
+            </button>
+        )}
+
+        {/* CSS for Text Layer and Highlights */}
+        <style dangerouslySetInnerHTML={{ __html: `
+            .textLayer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; color: transparent; cursor: text; pointer-events: auto; z-index: 2; }
+            .textLayer span { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
+            .page-container { transition: transform 0.2s ease; z-index: 1; }
+            .page-container:hover { transform: scale(1.005); }
+            
+            /* Visual Highlight Overlay */
+            .pdf-hl { background-color: rgba(250, 204, 21, 0.4); border-radius: 2px; }
+        `}} />
     </div>
   );
 });
@@ -227,56 +281,109 @@ const PdfViewer = React.memo(({ url, title }) => {
 function ResourceViewerModal({ resource, user, onClose, onLike }) {
   const hasLiked = resource.likes?.some(l => l.userId === user?.id);
   const likeCount = resource._count?.likes || 0;
+  const [highlights, setHighlights] = React.useState([]);
+  const [showHighlightSidebar, setShowHighlightSidebar] = React.useState(false);
+
+  React.useEffect(() => {
+    if (resource.id && user?.id) {
+        fetch(`/api/highlights/${user.id}?resourceId=${resource.id}`)
+            .then(res => res.json())
+            .then(data => { if (data.success) setHighlights(data.highlights); })
+            .catch(console.error);
+    }
+  }, [resource.id, user?.id]);
+
+  const handleHighlight = async (text, pageIndex) => {
+    try {
+        const res = await fetch('/api/highlights', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ userId: user.id, resourceId: resource.id, text, pageIndex })
+        });
+        const data = await res.json();
+        if (data.success) {
+            setHighlights([data.highlight, ...highlights]);
+        }
+    } catch(err) {
+        console.error(err);
+    }
+  };
+
+  const deleteHighlight = async (id) => {
+    try {
+        const res = await fetch(`/api/highlights/${id}`, {
+            method: 'DELETE',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ userId: user.id })
+        });
+        if ((await res.json()).success) {
+            setHighlights(highlights.filter(h => h.id !== id));
+        }
+    } catch(err) {
+        console.error(err);
+    }
+  };
 
   return (
     <div className="fixed inset-0 z-[999] bg-[#f8fafc] dark:bg-[#0f1219] flex flex-col">
       {/* Header */}
       <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-4 md:px-6 py-3 md:py-4 flex items-center gap-3 shrink-0 shadow-sm z-10">
-        
-        {/* Back button — always visible */}
-        <button
-          onClick={onClose}
-          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-black text-sm transition-all border border-slate-200 dark:border-white/10 shrink-0"
-        >
-          <ArrowLeft size={18} /> <span className="hidden sm:inline">Back</span>
-        </button>
-
-        {/* Title — centered, truncated */}
-        <h2 className="flex-1 text-sm md:text-base lg:text-lg font-black text-slate-900 dark:text-white truncate text-center">
-          {resource.title}
-        </h2>
-
-        {/* Actions */}
+        <button onClick={onClose} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-black text-sm transition-all border border-slate-200 dark:border-white/10 shrink-0"><ArrowLeft size={18} /> <span className="hidden sm:inline">Back</span></button>
+        <h2 className="flex-1 text-sm md:text-base lg:text-lg font-black text-slate-900 dark:text-white truncate text-center">{resource.title}</h2>
         <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => onLike(resource.id)}
-            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs md:text-sm font-black transition-all border ${
-              hasLiked
-                ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
-                : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-rose-300 hover:text-rose-500'
-            }`}
+          <button 
+            onClick={() => setShowHighlightSidebar(!showHighlightSidebar)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs md:text-sm font-black transition-all border ${showHighlightSidebar ? 'bg-yellow-400 text-slate-900 border-yellow-500' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-yellow-400'}`}
           >
-            <ThumbsUp size={15} className={hasLiked ? 'fill-rose-500' : ''} />
-            <span>{likeCount}</span>
+            <Highlighter size={15} /> <span>{highlights.length}</span>
           </button>
-          <a
-            href={resource.fileUrl}
-            download={resource.title}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 text-white text-xs md:text-sm font-black hover:bg-blue-500 transition-colors shadow-sm"
-          >
-            <UploadCloud size={15} /> <span className="hidden sm:inline">Download</span>
-          </a>
+          <button onClick={() => onLike(resource.id)} className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs md:text-sm font-black transition-all border ${hasLiked ? 'bg-rose-500/10 text-rose-500 border-rose-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-rose-300 hover:text-rose-500'}`}>
+            <ThumbsUp size={15} className={hasLiked ? 'fill-rose-500' : ''} /> <span>{likeCount}</span>
+          </button>
+          <a href={resource.fileUrl} download={resource.title} className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 text-white text-xs md:text-sm font-black hover:bg-blue-500 transition-colors shadow-sm"><UploadCloud size={15} /> <span className="hidden sm:inline">Download</span></a>
         </div>
       </div>
 
-      {/* PDF / Image Body */}
-      <div className="flex-1 overflow-hidden">
-        {resource.fileType === 'pdf' ? (
-          <PdfViewer url={resource.fileUrl} title={resource.title} />
-        ) : (
-          <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
-            <img src={resource.fileUrl} alt={resource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
-          </div>
+      <div className="flex-1 flex overflow-hidden">
+        {/* Main Viewer */}
+        <div className="flex-1 overflow-hidden relative">
+            {resource.fileType === 'pdf' ? (
+                <PdfViewer url={resource.fileUrl} title={resource.title} highlights={highlights} onHighlight={handleHighlight} />
+            ) : (
+                <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
+                    <img src={resource.fileUrl} alt={resource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
+                </div>
+            )}
+        </div>
+
+        {/* Highlights Sidebar */}
+        {showHighlightSidebar && (
+            <div className="w-80 bg-white dark:bg-[#161923] border-l border-slate-200 dark:border-white/10 flex flex-col animate-in slide-in-from-right duration-300">
+                <div className="p-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
+                    <h3 className="font-black text-sm text-slate-900 dark:text-white uppercase tracking-wider">Document Highlights</h3>
+                    <span className="text-[10px] font-bold text-slate-400 bg-slate-100 dark:bg-white/5 px-2 py-0.5 rounded-full">{highlights.length}</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+                    {highlights.length === 0 && (
+                        <div className="text-center py-10">
+                            <Highlighter size={32} className="mx-auto mb-2 opacity-10" />
+                            <p className="text-xs text-slate-500 italic">No highlights yet. Select text in the PDF to add one!</p>
+                        </div>
+                    )}
+                    {highlights.map(h => (
+                        <div key={h.id} className="bg-slate-50 dark:bg-[#0B0E14] p-3 rounded-xl border border-slate-200 dark:border-white/5 group">
+                            <div className="flex justify-between items-center mb-2">
+                                <span className="text-[9px] font-black text-yellow-600 dark:text-yellow-400 uppercase tracking-widest bg-yellow-500/10 px-1.5 py-0.5 rounded">Page {h.pageIndex + 1}</span>
+                                <button onClick={() => deleteHighlight(h.id)} className="text-slate-400 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={12} /></button>
+                            </div>
+                            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 line-clamp-3 leading-relaxed italic">"{h.text}"</p>
+                        </div>
+                    ))}
+                </div>
+                <div className="p-4 bg-slate-50 dark:bg-black/20 border-t border-slate-100 dark:border-white/5">
+                    <p className="text-[10px] text-slate-500 font-medium leading-normal">Selected snippets are automatically stored in your <strong className="text-blue-500">Study Vault</strong> for later review.</p>
+                </div>
+            </div>
         )}
       </div>
     </div>
@@ -480,6 +587,8 @@ export default function App() {
   const [timetableSchedules, setTimetableSchedules] = useState([]);
   const [timetableStats, setTimetableStats] = useState({ streak: 0, focusTime: 0 });
   const [isGoalsLoading, setIsGoalsLoading] = useState(true);
+  const [highlights, setHighlights] = useState([]);
+  const [noteTab, setNoteTab] = useState('My Notes');
 
   const modeSubjects = useMemo(() => ({
     jee: ['Maths', 'Physics', 'Chemistry'],
@@ -557,6 +666,11 @@ export default function App() {
       fetch('/api/doubts')
         .then(res => res.json())
         .then(data => { if (data.success) setDoubts(data.doubts); })
+        .catch(console.error);
+      // Prefetch highlights
+      fetch(`/api/highlights/${user.id}`)
+        .then(res => res.json())
+        .then(data => { if (data.success) setHighlights(data.highlights); })
         .catch(console.error);
     }
   }, [user?.id]);
@@ -1920,27 +2034,99 @@ export default function App() {
 
           {activeTab === 'Notes' && (
             <div className="animate-in fade-in duration-500">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white">My Notes</h2>
-                <button className="bg-blue-600 text-white px-4 py-2 rounded-xl text-sm font-bold shadow-[0_4px_15px_rgba(37,99,235,0.2)] hover:bg-blue-700 transition">+ New Note</button>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2">My Study Vault</h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Access your hand-written notes and key snippets from PDFs.</p>
+                </div>
+                <div className="flex gap-2">
+                    <button 
+                        onClick={() => setNoteTab('My Notes')} 
+                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all border ${noteTab === 'My Notes' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-lg' : 'bg-white dark:bg-[#161923] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#333942] hover:border-slate-400'}`}
+                    >
+                        Notes
+                    </button>
+                    <button 
+                        onClick={() => setNoteTab('My Highlights')} 
+                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all border ${noteTab === 'My Highlights' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-lg' : 'bg-white dark:bg-[#161923] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#333942] hover:border-slate-400'}`}
+                    >
+                        Highlights
+                    </button>
+                </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {[
-                  { title: 'Thermodynamics Laws', subject: 'Physics', date: 'Oct 12', color: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-500/20' },
-                  { title: 'Organic Named Reactions', subject: 'Chemistry', date: 'Oct 10', color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20' },
-                  { title: 'Calculus Integration Tricks', subject: 'Maths', date: 'Oct 08', color: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-500/20' },
-                  { title: 'Human Reproduction', subject: 'Biology', date: 'Oct 05', color: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-500/20' },
-                ].map((note, i) => (
-                  <div key={i} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl p-5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-blue-400 dark:hover:border-blue-500/50 transition cursor-pointer group">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${note.color}`}><FileText size={20} /></div>
-                      <span className="text-xs font-bold text-slate-500">{note.date}</span>
+
+              {noteTab === 'My Notes' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  {[
+                    { title: 'Thermodynamics Laws', subject: 'Physics', date: 'Oct 12', color: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-500/20' },
+                    { title: 'Organic Named Reactions', subject: 'Chemistry', date: 'Oct 10', color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20' },
+                    { title: 'Calculus Integration Tricks', subject: 'Maths', date: 'Oct 08', color: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-100 dark:border-orange-500/20' },
+                    { title: 'Human Reproduction', subject: 'Biology', date: 'Oct 05', color: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-100 dark:border-rose-500/20' },
+                  ].map((note, i) => (
+                    <div key={i} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl p-5 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-blue-400 dark:hover:border-blue-500/50 transition cursor-pointer group">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${note.color}`}><FileText size={20} /></div>
+                        <span className="text-xs font-bold text-slate-500">{note.date}</span>
+                      </div>
+                      <h4 className="font-bold text-slate-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{note.title}</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">{note.subject}</p>
                     </div>
-                    <h4 className="font-bold text-slate-900 dark:text-white mb-1 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition">{note.title}</h4>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">{note.subject}</p>
+                  ))}
+                  <div className="bg-slate-50/50 dark:bg-[#0B0E14]/10 border-2 border-dashed border-slate-200 dark:border-[#333942] rounded-2xl flex flex-col items-center justify-center p-8 hover:border-blue-400 transition cursor-pointer group">
+                    <Plus size={32} className="text-slate-300 group-hover:text-blue-500 mb-2" />
+                    <span className="text-sm font-bold text-slate-400 group-hover:text-blue-500">Add New Note</span>
                   </div>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                    {highlights.length === 0 ? (
+                        <div className="py-20 text-center bg-white/50 dark:bg-[#161923]/30 rounded-3xl border border-dashed border-slate-200 dark:border-[#333942]">
+                            <Highlighter size={48} className="mx-auto mb-4 opacity-20" />
+                            <p className="text-slate-500">Your highlights will appear here once you bookmark lines in PDFs.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {highlights.map((h) => (
+                                <div key={h.id} className="bg-white dark:bg-[#161923] p-5 rounded-2xl border border-slate-200 dark:border-[#333942] shadow-sm flex flex-col gap-4 group">
+                                    <div className="flex justify-between items-center">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-2 h-2 rounded-full bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,0.5)]"></div>
+                                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{h.resource?.title || 'Resource'} — Page {h.pageIndex + 1}</span>
+                                        </div>
+                                        <button 
+                                            onClick={async (e) => {
+                                                e.stopPropagation();
+                                                if(!confirm('Remove this highlight?')) return;
+                                                const res = await fetch(`/api/highlights/${h.id}`, {
+                                                    method: 'DELETE',
+                                                    headers: {'Content-Type': 'application/json'},
+                                                    body: JSON.stringify({ userId: user.id })
+                                                });
+                                                if((await res.json()).success) {
+                                                    setHighlights(prev => prev.filter(x => x.id !== h.id));
+                                                }
+                                            }}
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-400 hover:text-rose-500"
+                                        >
+                                            <Trash2 size={16} />
+                                        </button>
+                                    </div>
+                                    <p className="text-sm font-medium text-slate-700 dark:text-slate-300 italic border-l-4 border-yellow-400/50 pl-4 py-1 leading-relaxed bg-yellow-400/5 dark:bg-yellow-400/10 rounded-r-lg">"{h.text}"</p>
+                                    <button 
+                                        onClick={() => {
+                                            const res = dbResources.find(r => r.id === h.resourceId);
+                                            if(res) setSelectedResource(res);
+                                        }}
+                                        className="text-xs font-bold text-blue-600 hover:text-blue-500 flex items-center gap-1.5 self-start"
+                                    >
+                                        Jump to PDF <ArrowUpRight size={14} />
+                                    </button>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </div>
+              )}
             </div>
           )}
           {activeTab === 'Doubts' && (
