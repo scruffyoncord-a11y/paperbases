@@ -157,7 +157,14 @@ const AdobePdfViewer = ({ url, title }) => {
         adobeDCView.previewFile({
           content: { location: { url } },
           metaData: { fileName: title || "Document.pdf" }
-        }, { embedMode: "SIZED_CONTAINER" });
+        }, { 
+          embedMode: "FULL_WINDOW",
+          showAnnotationTools: true,
+          showDownloadPDF: true,
+          showPrintPDF: true,
+          showLeftHandPanel: true,
+          defaultViewMode: "FIT_WIDTH"
+        });
       }
     };
 
@@ -949,31 +956,17 @@ export default function App() {
         {/* PDF/Resource Viewer Modal */}
         {selectedResource && (
             <div className="fixed inset-0 z-[100] flex flex-col bg-slate-900/95 backdrop-blur-xl animate-in fade-in duration-300">
-                <div className="p-4 border-b border-white/10 flex justify-between items-center bg-[#0B0E14] shrink-0">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => setSelectedResource(null)} className="px-4 py-2 rounded-xl bg-white/5 flex items-center justify-center gap-2 hover:bg-white/10 transition-colors text-white font-bold border border-white/10 shadow-sm"><ArrowLeft size={18} /> Back</button>
-                        <div>
-                            <h3 className="text-xl font-black text-white">{selectedResource.title}</h3>
-                            <div className="flex items-center gap-2 mt-1">
-                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest bg-blue-500/20 text-blue-400 border border-blue-500/30`}>{selectedResource.subject}</span>
-                                {selectedResource.tag && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest bg-white/10 text-slate-300">{selectedResource.tag}</span>}
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <button 
-                            onClick={() => handleLikeResource(selectedResource.id)} 
-                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-black transition-colors ${selectedResource.likes?.some(l => l.userId === user?.id) ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-white/5 text-slate-300 border border-white/10 hover:bg-white/10'}`}
-                        >
-                            <ThumbsUp size={16} className={selectedResource.likes?.some(l => l.userId === user?.id) ? 'fill-rose-500' : ''} /> {selectedResource._count?.likes || 0}
-                        </button>
-                        <a href={selectedResource.fileUrl} download={selectedResource.title} className="flex items-center gap-2 px-6 py-2 rounded-xl bg-blue-600 text-white font-black hover:bg-blue-500 transition-colors shadow-lg">
-                            <UploadCloud size={16} /> Download Copy
-                        </a>
-                    </div>
-                </div>
-                <div className="flex-1 w-full bg-[#161923] p-4 md:p-8 flex items-center justify-center overflow-hidden">
-                    <div className="w-full max-w-5xl h-full bg-white rounded-xl overflow-hidden shadow-2xl relative border border-white/10">
+                {/* Floating Back Button */}
+                <button 
+                    onClick={() => setSelectedResource(null)} 
+                    className="fixed top-6 left-6 z-[110] w-12 h-12 rounded-full bg-white dark:bg-[#161923] flex items-center justify-center text-slate-900 dark:text-white shadow-2xl border border-slate-200 dark:border-white/10 hover:scale-110 active:scale-95 transition-all group"
+                    title="Close Viewer"
+                >
+                    <X size={24} className="group-hover:rotate-90 transition-transform duration-300" />
+                </button>
+
+                <div className="flex-1 w-full flex items-center justify-center overflow-hidden">
+                    <div className="w-full h-full bg-white relative">
                         {selectedResource.fileType === 'pdf' ? (
                             <AdobePdfViewer url={selectedResource.fileUrl} title={selectedResource.title} />
                         ) : (
