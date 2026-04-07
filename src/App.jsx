@@ -64,14 +64,15 @@ import {
   Image as ImageIcon
 } from 'lucide-react';
 
-import * as pdfjsLib from 'pdfjs-dist';
+import {
+  PdfLoader,
+  PdfHighlighter,
+  Highlight,
+  Popup,
+  AreaHighlight,
+} from "react-pdf-highlighter";
+import "react-pdf-highlighter/dist/style.css";
 
-// Configure pdf.js worker globally for the whole app
-// This uses the Vite-compatible worker loading strategy
-pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.js',
-  import.meta.url
-).toString();
 
 // Unified Syllabus Dataset
 const UNIFIED_SYLLABUS = {
@@ -148,189 +149,109 @@ const getStatusText = (status, repliesCount) => {
   return 'Unanswered';
 };
 
-// Memoized so it NEVER re-renders unless the URL or scale changes
-// Custom PDF Viewer using pdf.js for highlighting support
-const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight, scale = 1.5 }) => {
-  const containerRef = React.useRef(null);
-  const [numPages, setNumPages] = React.useState(0);
+// Custom PDF Viewer using react-pdf-highlighter for pro-level annotation
+const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
   const [isLoading, setIsLoading] = React.useState(true);
-  const [error, setError] = React.useState(false);
-  const [selection, setSelection] = React.useState(null);
 
-  // Helper to apply stored highlights to the DOM
-  const applyHighlights = React.useCallback(() => {
-    if (!containerRef.current || highlights.length === 0) return;
-    
-    // Simple text-based matching for now
-    const pages = containerRef.current.querySelectorAll('.page-container');
-    highlights.forEach(hl => {
-        const page = pages[hl.pageIndex];
-        if (!page) return;
-        
-        const textLayer = page.querySelector('.textLayer');
-        if (!textLayer) return;
-        
-        const spans = textLayer.querySelectorAll('span');
-        spans.forEach(span => {
-            if (span.textContent.includes(hl.text) || hl.text.includes(span.textContent)) {
-                span.classList.add(`hl-${hl.color || 'yellow'}`, 'pdf-hl');
-            }
-        });
-    });
+  // Format existing Highlights properly
+  const formattedHighlights = React.useMemo(() => {
+     return highlights.map(h => {
+         // Gracefully handle older text-only highlights
+         const position = h.position ? (typeof h.position === 'string' ? JSON.parse(h.position) : h.position) : {
+            boundingRect: { x1: 0, y1: 0, x2: 0, y2: 0, width: 0, height: 0, pageNumber: h.pageIndex + 1 },
+            rects: []
+         };
+         const content = h.content ? (typeof h.content === 'string' ? JSON.parse(h.content) : h.content) : { text: h.text || "Older highlight" };
+         
+         return {
+             id: String(h.id),
+             content,
+             position,
+             comment: { text: "", color: h.color || 'yellow' }
+         };
+     });
   }, [highlights]);
 
-  React.useEffect(() => {
-    let isMounted = true;
-    const loadPdf = async () => {
-      setIsLoading(true);
-      setError(false);
-      try {
-        let pdfData = url;
-        // Handle Base64 strings correctly
-        if (url.startsWith('data:application/pdf;base64,')) {
-            const base64Data = url.split(',')[1];
-            const binaryString = window.atob(base64Data);
-            const bytes = new Uint8Array(binaryString.length);
-            for (let i = 0; i < binaryString.length; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            pdfData = { data: bytes };
-        }
-
-        const loadingTask = pdfjsLib.getDocument(pdfData);
-        const pdf = await loadingTask.promise;
-        if (!isMounted) return;
-        setNumPages(pdf.numPages);
-        
-        const container = containerRef.current;
-        if (!container) return;
-        container.innerHTML = ''; 
-        
-        for (let i = 1; i <= pdf.numPages; i++) {
-          const page = await pdf.getPage(i);
-          const viewport = page.getViewport({ scale });
-          
-          const pageWrapper = document.createElement('div');
-          pageWrapper.className = 'relative mb-8 mx-auto shadow-2xl bg-white page-container min-h-[500px]';
-          pageWrapper.style.width = `${viewport.width}px`;
-          pageWrapper.style.height = `${viewport.height}px`;
-          pageWrapper.dataset.page = i - 1; 
-          
-          const canvas = document.createElement('canvas');
-          canvas.className = 'absolute inset-0';
-          const context = canvas.getContext('2d');
-          canvas.height = viewport.height;
-          canvas.width = viewport.width;
-          await page.render({ canvasContext: context, viewport }).promise;
-          
-          const textLayer = document.createElement('div');
-          textLayer.className = 'absolute inset-0 textLayer opacity-20 hover:opacity-100 transition-opacity';
-          const textContent = await page.getTextContent();
-          pdfjsLib.renderTextLayer({
-            textContent,
-            container: textLayer,
-            viewport,
-            enhanceTextSelection: true
-          });
-          
-          pageWrapper.appendChild(canvas);
-          pageWrapper.appendChild(textLayer);
-          container.appendChild(pageWrapper);
-        }
-        setIsLoading(false);
-        // Apply highlights after short delay to ensure text layer is ready
-        setTimeout(applyHighlights, 200);
-      } catch (err) {
-        console.error('PDF JS Error:', err);
-        setError(true);
-        setIsLoading(false);
-      }
-    };
-
-    loadPdf();
-    return () => { isMounted = false; };
-  }, [url, scale]);
-
-  // Handle text selection
-  const handleMouseUp = () => {
-    const sel = window.getSelection();
-    const text = sel.toString().trim();
-    if (text && text.length > 2) {
-      const range = sel.getRangeAt(0);
-      const rect = range.getBoundingClientRect();
-      
-      // Find which page we are on
-      let pageIndex = 0;
-      let node = range.startContainer;
-      while (node && !node.classList?.contains('page-container')) {
-        node = node.parentElement;
-      }
-      if (node) pageIndex = parseInt(node.dataset.page, 10);
-
-      setSelection({
-        text,
-        pageIndex,
-        x: rect.left + rect.width / 2,
-        y: rect.top + window.scrollY - 40
-      });
-    } else {
-      setSelection(null);
-    }
-  };
-
-  if (error) return <div className="p-20 text-center text-rose-500 font-bold">Failed to load PDF engine.</div>;
+  // Colors mapping for Tip
+  const COLORS = [
+    { id: 'yellow', bg: 'bg-yellow-400', glow: 'shadow-[0_0_12px_rgba(250,204,21,0.5)]' },
+    { id: 'green', bg: 'bg-emerald-400', glow: 'shadow-[0_0_12px_rgba(52,211,153,0.5)]' },
+    { id: 'blue', bg: 'bg-sky-400', glow: 'shadow-[0_0_12px_rgba(56,189,248,0.5)]' },
+    { id: 'pink', bg: 'bg-rose-400', glow: 'shadow-[0_0_12px_rgba(251,113,133,0.5)]' },
+  ];
 
   return (
-    <div className="w-full h-full relative bg-[#1c1f26] overflow-y-auto no-scrollbar" onMouseUp={handleMouseUp}>
-        {isLoading && (
-            <div className="sticky top-0 inset-x-0 h-1 bg-blue-600 animate-pulse z-50"></div>
-        )}
-        <div ref={containerRef} className="p-4 md:p-8 flex flex-col items-center">
-            {/* Pages rendered here */}
-        </div>
-        
-        {/* Floating Highlight Button */}
-        {selection && (
-            <div 
-                className="fixed bg-white dark:bg-[#161923] p-1.5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex items-center gap-1 animate-in zoom-in-95 fade-in duration-200 z-[1001] border border-slate-200 dark:border-white/10"
-                style={{ left: selection.x, top: selection.y, transform: 'translateX(-50%)' }}
-            >
-                {[
-                  { id: 'yellow', bg: 'bg-yellow-400', glow: 'shadow-[0_0_12px_rgba(250,204,21,0.5)]' },
-                  { id: 'green', bg: 'bg-emerald-400', glow: 'shadow-[0_0_12px_rgba(52,211,153,0.5)]' },
-                  { id: 'blue', bg: 'bg-sky-400', glow: 'shadow-[0_0_12px_rgba(56,189,248,0.5)]' },
-                  { id: 'pink', bg: 'bg-rose-400', glow: 'shadow-[0_0_12px_rgba(251,113,133,0.5)]' },
-                ].map((color) => (
-                  <button
-                    key={color.id}
-                    onClick={() => {
-                        onHighlight(selection.text, selection.pageIndex, color.id);
-                        setSelection(null);
-                        window.getSelection().removeAllRanges();
-                    }}
-                    className={`w-8 h-8 rounded-xl ${color.bg} ${color.glow} hover:scale-110 active:scale-90 transition-all flex items-center justify-center text-slate-900 shadow-sm`}
-                    title={`Highlight in ${color.id}`}
-                  >
-                    <Highlighter size={14} />
-                  </button>
-                ))}
-            </div>
-        )}
+    <div className="w-full h-full relative bg-[#1c1f26] overflow-hidden">
+       {isLoading && <div className="absolute top-0 inset-x-0 h-1 bg-blue-600 animate-pulse z-50"></div>}
+       <PdfLoader 
+           url={url} 
+           beforeLoad={<div className="p-20 flex flex-col items-center justify-center text-slate-400 font-bold h-full"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>Loading Document...</div>}
+           workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"
+           onError={(err) => { setIsLoading(false); console.error(err); }}
+       >
+          {(pdfDocument) => {
+              if (isLoading) setIsLoading(false);
+              return (
+                  <PdfHighlighter
+                      pdfDocument={pdfDocument}
+                      enableAreaSelection={(event) => event.altKey}
+                      onScrollChange={() => {}}
+                      scrollRef={() => {}}
+                      onSelectionFinished={(position, content, hideTipAndSelection, transformSelection) => (
+                          <div className="bg-white dark:bg-[#161923] p-1.5 rounded-2xl shadow-[0_10px_40px_rgba(0,0,0,0.3)] flex items-center gap-1 animate-in zoom-in-95 fade-in duration-200 z-[1001] border border-slate-200 dark:border-white/10 m-2 cursor-pointer">
+                            {COLORS.map((color) => (
+                              <button
+                                key={color.id}
+                                onClick={() => {
+                                    onHighlight(content, position, color.id);
+                                    hideTipAndSelection();
+                                }}
+                                className={`w-8 h-8 rounded-xl ${color.bg} ${color.glow} hover:scale-110 active:scale-90 transition-all flex items-center justify-center text-slate-900 shadow-sm`}
+                                title={`Highlight in ${color.id}`}
+                              >
+                                <Highlighter size={14} />
+                              </button>
+                            ))}
+                          </div>
+                      )}
+                      highlightTransform={(highlight, index, setTip, hideTip, viewportToScaled, screenshot, isScrolledTo) => {
+                          const isTextHighlight = !Boolean(highlight.content?.image);
+                          const colorClass = highlight.comment?.color === 'green' ? 'hl-green' : 
+                                             highlight.comment?.color === 'blue' ? 'hl-blue' :
+                                             highlight.comment?.color === 'pink' ? 'hl-pink' : 'hl-yellow';
 
-        {/* Visual Highlight Styles */}
-        <style dangerouslySetInnerHTML={{ __html: `
-            .textLayer { position: absolute; left: 0; top: 0; right: 0; bottom: 0; color: transparent; cursor: text; pointer-events: auto; z-index: 2; }
-            .textLayer span { color: transparent; position: absolute; white-space: pre; cursor: text; transform-origin: 0% 0%; }
-            .page-container { transition: transform 0.2s ease; z-index: 1; }
-            .page-container:hover { transform: scale(1.002); }
+                          const component = isTextHighlight ? (
+                              <div className={colorClass}>
+                                  <Highlight isScrolledTo={isScrolledTo} position={highlight.position} comment={highlight.comment} />
+                              </div>
+                          ) : (
+                              <div className={colorClass}>
+                                  <AreaHighlight isScrolledTo={isScrolledTo} highlight={highlight} onChange={() => {}} />
+                              </div>
+                          );
+
+                          return (
+                              <Popup popupContent={<></>} onMouseOver={() => {}} onMouseOut={hideTip} key={index} children={component} />
+                          );
+                      }}
+                      highlights={formattedHighlights}
+                  />
+              );
+          }}
+       </PdfLoader>
+       <style dangerouslySetInnerHTML={{ __html: `
+            .PdfHighlighter { background-color: #1c1f26; }
+            .Highlight__part { opacity: 0.4; }
+            .hl-yellow .Highlight__part { background-color: rgba(250, 204, 21, 1); }
+            .hl-green .Highlight__part { background-color: rgba(52, 211, 153, 1); }
+            .hl-blue .Highlight__part { background-color: rgba(56, 189, 248, 1); }
+            .hl-pink .Highlight__part { background-color: rgba(251, 113, 133, 1); }
             
-            /* Visual Highlight Overlays */
-            .hl-yellow { background-color: rgba(250, 204, 21, 0.4); }
-            .hl-green { background-color: rgba(52, 211, 153, 0.4); }
-            .hl-blue { background-color: rgba(56, 189, 248, 0.4); }
-            .hl-pink { background-color: rgba(251, 113, 133, 0.4); }
-            .pdf-hl { border-radius: 2px; }
-        `}} />
+            .hl-yellow .AreaHighlight { border: 2px solid rgba(250, 204, 21, 1); background-color: rgba(250, 204, 21, 0.4); }
+            .hl-green .AreaHighlight { border: 2px solid rgba(52, 211, 153, 1); background-color: rgba(52, 211, 153, 0.4); }
+            .hl-blue .AreaHighlight { border: 2px solid rgba(56, 189, 248, 1); background-color: rgba(56, 189, 248, 0.4); }
+            .hl-pink .AreaHighlight { border: 2px solid rgba(251, 113, 133, 1); background-color: rgba(251, 113, 133, 0.4); }
+       `}} />
     </div>
   );
 });
@@ -353,12 +274,23 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
     }
   }, [resource.id, user?.id]);
 
-  const handleHighlight = async (text, pageIndex, color = 'yellow') => {
+  const handleHighlight = async (content, position, color = 'yellow') => {
     try {
+        const textToSave = content.text || 'Area selection (Image/Diagram)';
+        const pageIndex = position.boundingRect.pageNumber - 1; // Convert 1-based pageNumber to 0-based index
+
         const res = await fetch('/api/highlights', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({ userId: user.id, resourceId: resource.id, text, pageIndex, color })
+            body: JSON.stringify({ 
+                userId: user.id, 
+                resourceId: resource.id, 
+                text: textToSave, 
+                pageIndex, 
+                color,
+                content,
+                position
+            })
         });
         const data = await res.json();
         if (data.success) {
@@ -390,26 +322,8 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
       <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-4 md:px-6 py-3 md:py-4 flex items-center gap-3 shrink-0 shadow-sm z-10">
         <button onClick={onClose} className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-black text-sm transition-all border border-slate-200 dark:border-white/10 shrink-0"><ArrowLeft size={18} /> <span className="hidden sm:inline">Back</span></button>
         
-        {/* Zoom Controls */}
-        <div className="hidden md:flex items-center bg-slate-100 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/10 p-1 shrink-0">
-            <button 
-                onClick={() => setZoomScale(Math.max(0.5, zoomScale - 0.25))}
-                className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all"
-                title="Zoom Out"
-            >
-                <TrendingDown size={18} />
-            </button>
-            <span className="px-3 text-xs font-black text-slate-600 dark:text-slate-400 min-w-[60px] text-center">
-                {Math.round(zoomScale * 100)}%
-            </span>
-            <button 
-                onClick={() => setZoomScale(Math.min(3, zoomScale + 0.25))}
-                className="p-2 hover:bg-white dark:hover:bg-white/10 rounded-lg text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all"
-                title="Zoom In"
-            >
-                <TrendingUp size={18} />
-            </button>
-        </div>
+  // Note: react-pdf-highlighter handles its own zoom/scroll scaling flawlessly via CSS and scroll hooks, 
+  // so we optionally removed the manual zoom control buttons. But we will hide them if they were here.
 
         <h2 className="flex-1 text-sm md:text-base lg:text-lg font-black text-slate-900 dark:text-white truncate text-center mx-2">{resource.title}</h2>
         <div className="flex items-center gap-2 shrink-0">
@@ -430,7 +344,7 @@ function ResourceViewerModal({ resource, user, onClose, onLike }) {
         {/* Main Viewer */}
         <div className="flex-1 overflow-hidden relative">
             {resource.fileType === 'pdf' ? (
-                <PdfViewer url={resource.fileUrl} title={resource.title} highlights={highlights} onHighlight={handleHighlight} scale={zoomScale} />
+                <PdfViewer url={resource.fileUrl} title={resource.title} highlights={highlights} onHighlight={handleHighlight} />
             ) : (
                 <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
                     <img src={resource.fileUrl} alt={resource.title} className="max-w-full h-auto rounded-lg shadow-xl" />

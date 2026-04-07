@@ -552,8 +552,8 @@ app.put('/api/doubts/:id/resolve', async (req, res) => {
 
 // Create a new highlight
 app.post('/api/highlights', async (req, res) => {
-  const { userId, resourceId, text, pageIndex, color } = req.body;
-  if (!userId || !resourceId || !text) {
+  const { userId, resourceId, text, pageIndex, color, position, content } = req.body;
+  if (!userId || !resourceId || (!text && !position)) {
     return res.status(400).json({ success: false, message: 'Missing required fields' });
   }
 
@@ -564,7 +564,9 @@ app.post('/api/highlights', async (req, res) => {
         resourceId: parseInt(resourceId, 10),
         text,
         pageIndex: parseInt(pageIndex, 10) || 0,
-        color: color || 'yellow'
+        color: color || 'yellow',
+        position: position || undefined,
+        content: content || undefined
       },
       include: {
         resource: { select: { title: true } }
