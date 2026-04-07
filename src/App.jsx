@@ -163,6 +163,11 @@ const AdobePdfViewer = ({ url, title }) => {
           showDownloadPDF: true,
           showPrintPDF: true,
           showLeftHandPanel: true,
+          showPageControls: true,
+          showZoomControl: true,
+          enableAnnotationAPIs: true,
+          includePDFAnnotations: true,
+          enableTextHighlight: true,
           defaultViewMode: "FIT_WIDTH"
         });
       }
@@ -970,9 +975,9 @@ export default function App() {
             </div>
         )}
 
-        {/* Full-Page style Resource Viewer inside Main */}
+        {/* Full-Page style Resource Viewer */}
         {selectedResource && (
-            <div className="absolute inset-0 z-[100] bg-[#f8fafc] dark:bg-[#0f1219] flex flex-col animate-in slide-in-from-right-8 duration-300">
+            <div className="fixed inset-0 z-[200] bg-[#f8fafc] dark:bg-[#0f1219] flex flex-col animate-in slide-in-from-right-8 duration-300">
                 {/* Header matching Screenshot 2 style */}
                 <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-6 py-4 flex flex-wrap items-center justify-between shrink-0 shadow-sm z-10 gap-4">
                     <button onClick={() => setSelectedResource(null)} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-bold transition-colors">
