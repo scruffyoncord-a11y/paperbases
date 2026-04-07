@@ -60,9 +60,14 @@ import {
   Trash2,
   ExternalLink,
   Highlighter,
-  ArrowUpRight,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ZoomIn,
+  ZoomOut,
+  ChevronLeft
 } from 'lucide-react';
+import { GlobalWorkerOptions } from "pdfjs-dist";
+
+GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 import {
   PdfLoader,
@@ -186,7 +191,7 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
        <PdfLoader 
            url={url} 
            beforeLoad={<div className="p-20 flex flex-col items-center justify-center text-slate-400 font-bold h-full"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>Loading Document...</div>}
-           workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js"
+           workerSrc="/pdf.worker.min.mjs"
            onError={(err) => { setIsLoading(false); console.error(err); }}
        >
           {(pdfDocument) => {
