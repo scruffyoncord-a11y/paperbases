@@ -158,7 +158,7 @@ const AdobePdfViewer = ({ url, title }) => {
           content: { location: { url } },
           metaData: { fileName: title || "Document.pdf" }
         }, { 
-          embedMode: "FULL_WINDOW",
+          embedMode: "SIZED_CONTAINER",
           showAnnotationTools: true,
           showDownloadPDF: true,
           showPrintPDF: true,
@@ -233,6 +233,7 @@ export default function App() {
   const [resourceFilter, setResourceFilter] = useState('All');
   const [isUploadingResource, setIsUploadingResource] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Compute current syllabus (DB version or default)
   // Simplified Syllabus
@@ -803,7 +804,13 @@ export default function App() {
         <div className="flex flex-col md:flex-row gap-4 mb-8">
             <div className="flex items-center flex-1 bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-xl px-4 py-2.5 shadow-sm focus-within:border-blue-500 transition-all">
                 <Search size={18} className="text-blue-500" />
-                <input type="text" placeholder="Search resources..." className="flex-1 bg-transparent outline-none text-slate-900 dark:text-white placeholder:text-slate-400 ml-3 text-sm" />
+                <input 
+                    type="text" 
+                    placeholder="Search resources..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="flex-1 bg-transparent outline-none text-slate-900 dark:text-white placeholder:text-slate-400 ml-3 text-sm" 
+                />
             </div>
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
                 {availableSubjects.map(sub => (
@@ -839,13 +846,23 @@ export default function App() {
 
         {resourceTab === 'Browse' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
-            {dbResources.length === 0 ? (
+            {dbResources.filter(r => 
+                r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                r.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                (r.tag && r.tag.toLowerCase().includes(searchQuery.toLowerCase()))
+            ).length === 0 ? (
                 <div className="col-span-full py-20 text-center text-slate-500">
                     <FolderSearch size={48} className="mx-auto mb-4 opacity-20" />
-                    <p>No resources found for this subject.</p>
+                    <p>No resources found matching "{searchQuery}".</p>
                 </div>
             ) : (
-                dbResources.map((res) => {
+                dbResources.filter(r => 
+                    r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    r.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    (r.tag && r.tag.toLowerCase().includes(searchQuery.toLowerCase()))
+                ).map((res) => {
                     const hasLiked = res.likes?.some(l => l.userId === user?.id);
                     return (
                     <div key={res.id} onClick={(e) => { if(e.target.closest('button') || e.target.closest('a')) return; setSelectedResource(res); }} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm hover:border-blue-500 transition-all group cursor-pointer relative overflow-hidden">
@@ -955,23 +972,39 @@ export default function App() {
 
         {/* PDF/Resource Viewer Modal */}
         {selectedResource && (
-            <div className="fixed inset-0 z-[100] flex flex-col bg-slate-900/95 backdrop-blur-xl animate-in fade-in duration-300">
-                {/* Floating Back Button */}
-                <button 
-                    onClick={() => setSelectedResource(null)} 
-                    className="fixed top-6 left-6 z-[110] w-12 h-12 rounded-full bg-white dark:bg-[#161923] flex items-center justify-center text-slate-900 dark:text-white shadow-2xl border border-slate-200 dark:border-white/10 hover:scale-110 active:scale-95 transition-all group"
-                    title="Close Viewer"
-                >
-                    <X size={24} className="group-hover:rotate-90 transition-transform duration-300" />
-                </button>
-
-                <div className="flex-1 w-full flex items-center justify-center overflow-hidden">
-                    <div className="w-full h-full bg-white relative">
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 backdrop-blur-md p-4 md:p-8 animate-in fade-in duration-300">
+                <div className="bg-white dark:bg-[#161923] w-full max-w-6xl h-full rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden flex flex-col animate-in slide-in-from-bottom-8 duration-500">
+                    <div className="p-4 md:p-6 border-b border-slate-100 dark:border-white/5 flex justify-between items-center shrink-0">
+                        <div className="flex items-center gap-4">
+                            <button onClick={() => setSelectedResource(null)} className="px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/5 flex items-center justify-center gap-2 hover:bg-slate-200 transition-colors text-slate-900 dark:text-white font-bold border border-slate-200 dark:border-white/10">
+                                <ArrowLeft size={18} /> Back
+                            </button>
+                            <div>
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white line-clamp-1">{selectedResource.title}</h3>
+                                <div className="flex items-center gap-2 mt-0.5">
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">{selectedResource.subject}</span>
+                                    {selectedResource.tag && <span className="text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-widest bg-slate-100 dark:bg-white/10 text-slate-500 dark:text-slate-400">{selectedResource.tag}</span>}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <button 
+                                onClick={() => handleLikeResource(selectedResource.id)} 
+                                className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs font-black transition-colors ${selectedResource.likes?.some(l => l.userId === user?.id) ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10 hover:bg-slate-200'}`}
+                            >
+                                <ThumbsUp size={16} className={selectedResource.likes?.some(l => l.userId === user?.id) ? 'fill-rose-500' : ''} /> {selectedResource._count?.likes || 0}
+                            </button>
+                            <a href={selectedResource.fileUrl} download={selectedResource.title} className="flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 text-white font-black hover:bg-blue-500 transition-colors shadow-lg text-xs">
+                                <UploadCloud size={16} /> <span className="hidden sm:inline">Download</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div className="flex-1 w-full bg-[#f8fafc] dark:bg-[#0B0E14] relative">
                         {selectedResource.fileType === 'pdf' ? (
                             <AdobePdfViewer url={selectedResource.fileUrl} title={selectedResource.title} />
                         ) : (
-                            <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
-                                <img src={selectedResource.fileUrl} alt={selectedResource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
+                            <div className="w-full h-full overflow-auto flex items-center justify-center p-8">
+                                <img src={selectedResource.fileUrl} alt={selectedResource.title} className="max-w-full h-auto rounded-lg shadow-2xl border border-slate-200 dark:border-white/10" />
                             </div>
                         )}
                     </div>
