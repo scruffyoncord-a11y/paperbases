@@ -136,55 +136,16 @@ const getStatusText = (status, repliesCount) => {
   return 'Unanswered';
 };
 
-const AdobePdfViewer = ({ url, title }) => {
-  useEffect(() => {
-    let script = document.getElementById('adobe-pdf-script');
-    if (!script) {
-      script = document.createElement('script');
-      script.id = 'adobe-pdf-script';
-      script.src = 'https://acrobatservices.adobe.com/view-sdk/main.js';
-      document.body.appendChild(script);
-    }
-    
-    const clientId = 'c66af15ac0f941e4b344af77fa38c1d0'; 
-    
-    const initView = () => {
-      if (window.AdobeDC) {
-        const adobeDCView = new window.AdobeDC.View({
-          clientId: clientId,
-          divId: "adobe-dc-view"
-        });
-        adobeDCView.previewFile({
-          content: { location: { url } },
-          metaData: { fileName: title || "Document.pdf" }
-        }, { 
-          embedMode: "SIZED_CONTAINER",
-          showAnnotationTools: true,
-          showDownloadPDF: true,
-          showPrintPDF: true,
-          showLeftHandPanel: true,
-          showPageControls: true,
-          showZoomControl: true,
-          enableAnnotationAPIs: true,
-          includePDFAnnotations: true,
-          enableTextHighlight: true,
-          defaultViewMode: "FIT_WIDTH"
-        });
-      }
-    };
-
-    if (window.AdobeDC) {
-      initView();
-    } else {
-      document.addEventListener("adobe_dc_view_sdk.ready", initView);
-    }
-
-    return () => {
-      document.removeEventListener("adobe_dc_view_sdk.ready", initView);
-    };
-  }, [url, title]);
-
-  return <div id="adobe-dc-view" className="w-full h-full"></div>;
+const PdfViewer = ({ url, title }) => {
+  return (
+    <iframe
+      src={url}
+      title={title || "Document"}
+      className="w-full h-full border-0"
+      style={{ minHeight: '100%' }}
+      allow="fullscreen"
+    />
+  );
 };
 
 export default function App() {
@@ -1025,7 +986,7 @@ export default function App() {
                     {/* Viewer Container */}
                     <div className="w-full max-w-5xl h-[85vh] bg-white rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative">
                         {selectedResource.fileType === 'pdf' ? (
-                            <AdobePdfViewer url={selectedResource.fileUrl} title={selectedResource.title} />
+                            <PdfViewer url={selectedResource.fileUrl} title={selectedResource.title} />
                         ) : (
                             <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
                                 <img src={selectedResource.fileUrl} alt={selectedResource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
