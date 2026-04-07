@@ -58,6 +58,7 @@ import {
   Filter,
   BarChart3,
   Trash2,
+  ExternalLink,
   Image as ImageIcon
 } from 'lucide-react';
 
@@ -137,14 +138,91 @@ const getStatusText = (status, repliesCount) => {
 };
 
 const PdfViewer = ({ url, title }) => {
+  const [blobUrl, setBlobUrl] = React.useState(url);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [error, setError] = React.useState(false);
+
+  React.useEffect(() => {
+    if (url && url.startsWith('data:application/pdf;base64,')) {
+      try {
+        const base64Data = url.split(',')[1];
+        const binaryString = window.atob(base64Data);
+        const bytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
+        const blob = new Blob([bytes], { type: 'application/pdf' });
+        const newUrl = URL.createObjectURL(blob);
+        setBlobUrl(newUrl);
+        setIsLoading(false);
+        return () => URL.revokeObjectURL(newUrl);
+      } catch (err) {
+        console.error('Failed to process PDF data:', err);
+        setError(true);
+        setIsLoading(false);
+      }
+    } else {
+      setBlobUrl(url);
+      setIsLoading(false);
+    }
+  }, [url]);
+
+  if (error) {
+    return (
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center bg-slate-50 dark:bg-[#0f1219]">
+            <div className="w-20 h-20 bg-rose-50 dark:bg-rose-500/10 rounded-3xl flex items-center justify-center text-rose-600 dark:text-rose-500 mb-6 border border-rose-100 dark:border-rose-500/20">
+                <Info size={40} />
+            </div>
+            <h4 className="text-slate-900 dark:text-white font-black text-lg mb-2">Corrupted PDF Data</h4>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-6 max-w-xs mx-auto">The PDF data appears to be missing or corrupted.</p>
+        </div>
+    );
+  }
+
   return (
-    <iframe
-      src={url}
-      title={title || "Document"}
-      className="w-full h-full border-0"
-      style={{ minHeight: '100%' }}
-      allow="fullscreen"
-    />
+    <div className="w-full h-full relative bg-slate-50 dark:bg-[#0f1219]">
+      {isLoading && (
+        <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-black/50 backdrop-blur-sm z-10">
+          <div className="flex flex-col items-center gap-4">
+            <Sparkles className="animate-spin text-blue-600" size={32} />
+            <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Preparing Document...</span>
+          </div>
+        </div>
+      )}
+      <object
+        data={`${blobUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+        type="application/pdf"
+        className="w-full h-full"
+        onLoad={() => setIsLoading(false)}
+        onError={() => { setError(true); setIsLoading(false); }}
+      >
+        <embed src={blobUrl} type="application/pdf" className="w-full h-full shadow-inner" />
+        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+            <div className="w-20 h-20 bg-blue-50 dark:bg-blue-500/10 rounded-3xl flex items-center justify-center text-blue-600 dark:text-blue-500 mb-6 border border-blue-100 dark:border-blue-500/20 shadow-sm">
+                <FileText size={40} />
+            </div>
+            <h4 className="text-slate-900 dark:text-white font-black text-lg mb-2">PDF Display Unavailable</h4>
+            <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 max-w-xs mx-auto">Your browser isn't supporting embedded PDF viewing, or the server blocked framing this document.</p>
+            <div className="flex flex-col gap-3 w-full max-w-xs">
+                <a 
+                    href={url} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-blue-600 text-white font-black shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                    <ExternalLink size={20} /> Open in New Tab
+                </a>
+                <a 
+                    href={url} 
+                    download={title || "Document.pdf"}
+                    className="flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-slate-100 dark:bg-white/5 text-slate-800 dark:text-slate-200 font-black hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/10"
+                >
+                    <UploadCloud size={20} /> Download PDF
+                </a>
+            </div>
+        </div>
+      </object>
+    </div>
   );
 };
 
