@@ -278,6 +278,7 @@ export default function App() {
   const [isUploadingResource, setIsUploadingResource] = useState(false);
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [resourceFile, setResourceFile] = useState(null);
 
   // Compute current syllabus (DB version or default)
   // Simplified Syllabus
@@ -587,6 +588,7 @@ export default function App() {
             const data = await res.json();
             if (data.success) {
                 setDbResources([data.resource, ...dbResources]);
+                setResourceFile(null);
                 setShowUploadModal(false);
                 e.target.reset();
             }
@@ -1012,11 +1014,30 @@ export default function App() {
                         </div>
                         <div>
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">File (PDF or Image)</label>
-                            <div className="relative group cursor-pointer">
-                                <input type="file" name="file" required accept=".pdf,image/*" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                                <div className="border-2 border-dashed border-slate-200 dark:border-white/10 rounded-2xl p-6 bg-slate-50 dark:bg-black/20 group-hover:border-blue-500 transition-all flex flex-col items-center">
-                                    <UploadCloud size={32} className="text-slate-300 group-hover:text-blue-500" />
-                                    <span className="text-xs text-slate-400 mt-2">Click or drag & drop</span>
+                            <div className="relative group cursor-pointer text-center">
+                                <input 
+                                    type="file" 
+                                    name="file" 
+                                    required 
+                                    accept=".pdf,image/*" 
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
+                                    onChange={(e) => setResourceFile(e.target.files[0])}
+                                />
+                                <div className={`border-2 border-dashed rounded-2xl p-6 transition-all flex flex-col items-center ${resourceFile ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-500/10' : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 group-hover:border-blue-500'}`}>
+                                    {resourceFile ? (
+                                        <>
+                                            <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center mb-2 shadow-lg shadow-blue-600/20">
+                                                <FileText size={24} />
+                                            </div>
+                                            <span className="text-sm font-bold text-blue-600 dark:text-blue-400 truncate max-w-[200px]">{resourceFile.name}</span>
+                                            <span className="text-[10px] text-slate-400 mt-1 uppercase font-black tracking-widest">Click to change</span>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <UploadCloud size={32} className="text-slate-300 group-hover:text-blue-500" />
+                                            <span className="text-xs text-slate-400 mt-2">Click or drag & drop</span>
+                                        </>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -1036,16 +1057,21 @@ export default function App() {
         {selectedResource && (
             <div className="fixed inset-0 z-[200] bg-[#f8fafc] dark:bg-[#0f1219] flex flex-col animate-in slide-in-from-right-8 duration-300">
                 {/* Header matching Screenshot 2 style */}
-                <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-6 py-4 flex flex-wrap items-center justify-between shrink-0 shadow-sm z-10 gap-4">
-                    <button onClick={() => setSelectedResource(null)} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white font-bold transition-colors">
-                        <ArrowLeft size={20} /> Back
-                    </button>
+                <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm z-10 gap-4">
+                    <div className="flex-1 flex justify-start">
+                        <button 
+                            onClick={() => setSelectedResource(null)} 
+                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-black text-sm transition-all border border-slate-200 dark:border-white/10 hover:border-slate-300 active:scale-95"
+                        >
+                            <ArrowLeft size={18} /> Back
+                        </button>
+                    </div>
                     
-                    <h2 className="text-base md:text-lg lg:text-xl font-black text-slate-900 dark:text-white flex-1 text-center px-4 line-clamp-1">
+                    <h2 className="hidden md:block text-lg lg:text-xl font-black text-slate-900 dark:text-white flex-1 text-center px-4 line-clamp-1">
                         {selectedResource.title}
                     </h2>
                     
-                    <div className="flex items-center gap-2 md:gap-3">
+                    <div className="flex-1 flex items-center justify-end gap-2 md:gap-3">
                         <button 
                             onClick={() => handleLikeResource(selectedResource.id)} 
                             className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs md:text-sm font-black transition-colors ${selectedResource.likes?.some(l => l.userId === user?.id) ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10 hover:bg-slate-200'}`}
