@@ -137,12 +137,15 @@ const getStatusText = (status, repliesCount) => {
   return 'Unanswered';
 };
 
-const PdfViewer = ({ url, title }) => {
-  const [blobUrl, setBlobUrl] = React.useState(url);
+// Memoized so it NEVER re-renders unless the URL itself changes
+const PdfViewer = React.memo(({ url, title }) => {
+  const [blobUrl, setBlobUrl] = React.useState(null);
   const [isLoading, setIsLoading] = React.useState(true);
   const [error, setError] = React.useState(false);
 
   React.useEffect(() => {
+    setIsLoading(true);
+    setError(false);
     if (url && url.startsWith('data:application/pdf;base64,')) {
       try {
         const base64Data = url.split(',')[1];
@@ -161,7 +164,7 @@ const PdfViewer = ({ url, title }) => {
         setError(true);
         setIsLoading(false);
       }
-    } else {
+    } else if (url) {
       setBlobUrl(url);
       setIsLoading(false);
     }
@@ -189,42 +192,96 @@ const PdfViewer = ({ url, title }) => {
           </div>
         </div>
       )}
-      <object
-        data={`${blobUrl}#toolbar=1&navpanes=1&scrollbar=1`}
-        type="application/pdf"
-        className="w-full h-full"
-        onLoad={() => setIsLoading(false)}
-        onError={() => { setError(true); setIsLoading(false); }}
-      >
-        <embed src={blobUrl} type="application/pdf" className="w-full h-full shadow-inner" />
-        <div className="flex flex-col items-center justify-center h-full p-8 text-center">
-            <div className="w-20 h-20 bg-blue-50 dark:bg-blue-500/10 rounded-3xl flex items-center justify-center text-blue-600 dark:text-blue-500 mb-6 border border-blue-100 dark:border-blue-500/20 shadow-sm">
-                <FileText size={40} />
-            </div>
-            <h4 className="text-slate-900 dark:text-white font-black text-lg mb-2">PDF Display Unavailable</h4>
-            <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 max-w-xs mx-auto">Your browser isn't supporting embedded PDF viewing, or the server blocked framing this document.</p>
-            <div className="flex flex-col gap-3 w-full max-w-xs">
-                <a 
-                    href={url} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-blue-600 text-white font-black shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
-                >
-                    <ExternalLink size={20} /> Open in New Tab
-                </a>
-                <a 
-                    href={url} 
-                    download={title || "Document.pdf"}
-                    className="flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-slate-100 dark:bg-white/5 text-slate-800 dark:text-slate-200 font-black hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/10"
-                >
-                    <UploadCloud size={20} /> Download PDF
-                </a>
-            </div>
-        </div>
-      </object>
+      {blobUrl && (
+        <object
+          data={`${blobUrl}#toolbar=1&navpanes=1&scrollbar=1`}
+          type="application/pdf"
+          className="w-full h-full"
+          onLoad={() => setIsLoading(false)}
+          onError={() => { setError(true); setIsLoading(false); }}
+        >
+          <embed src={blobUrl} type="application/pdf" className="w-full h-full shadow-inner" />
+          <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+              <div className="w-20 h-20 bg-blue-50 dark:bg-blue-500/10 rounded-3xl flex items-center justify-center text-blue-600 dark:text-blue-500 mb-6 border border-blue-100 dark:border-blue-500/20 shadow-sm">
+                  <FileText size={40} />
+              </div>
+              <h4 className="text-slate-900 dark:text-white font-black text-lg mb-2">PDF Display Unavailable</h4>
+              <p className="text-slate-500 dark:text-slate-400 text-sm mb-8 max-w-xs mx-auto">Your browser does not support embedded PDF viewing.</p>
+              <div className="flex flex-col gap-3 w-full max-w-xs">
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-blue-600 text-white font-black shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all">
+                      <ExternalLink size={20} /> Open in New Tab
+                  </a>
+                  <a href={url} download={title || "Document.pdf"} className="flex items-center justify-center gap-3 px-6 py-4 rounded-2xl bg-slate-100 dark:bg-white/5 text-slate-800 dark:text-slate-200 font-black hover:bg-slate-200 dark:hover:bg-white/10 transition-all border border-slate-200 dark:border-white/10">
+                      <UploadCloud size={20} /> Download PDF
+                  </a>
+              </div>
+          </div>
+        </object>
+      )}
     </div>
   );
-};
+});
+
+// ---- Isolated Resource Viewer Modal ----
+// Kept outside App so likes/state changes don't remount PdfViewer
+function ResourceViewerModal({ resource, user, onClose, onLike }) {
+  const hasLiked = resource.likes?.some(l => l.userId === user?.id);
+  const likeCount = resource._count?.likes || 0;
+
+  return (
+    <div className="fixed inset-0 z-[200] bg-[#f8fafc] dark:bg-[#0f1219] flex flex-col">
+      {/* Header */}
+      <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-4 md:px-6 py-3 md:py-4 flex items-center gap-3 shrink-0 shadow-sm z-10">
+        
+        {/* Back button — always visible */}
+        <button
+          onClick={onClose}
+          className="flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-black text-sm transition-all border border-slate-200 dark:border-white/10 shrink-0"
+        >
+          <ArrowLeft size={18} /> <span className="hidden sm:inline">Back</span>
+        </button>
+
+        {/* Title — centered, truncated */}
+        <h2 className="flex-1 text-sm md:text-base lg:text-lg font-black text-slate-900 dark:text-white truncate text-center">
+          {resource.title}
+        </h2>
+
+        {/* Actions */}
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => onLike(resource.id)}
+            className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs md:text-sm font-black transition-all border ${
+              hasLiked
+                ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10 hover:border-rose-300 hover:text-rose-500'
+            }`}
+          >
+            <ThumbsUp size={15} className={hasLiked ? 'fill-rose-500' : ''} />
+            <span>{likeCount}</span>
+          </button>
+          <a
+            href={resource.fileUrl}
+            download={resource.title}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-600 text-white text-xs md:text-sm font-black hover:bg-blue-500 transition-colors shadow-sm"
+          >
+            <UploadCloud size={15} /> <span className="hidden sm:inline">Download</span>
+          </a>
+        </div>
+      </div>
+
+      {/* PDF / Image Body */}
+      <div className="flex-1 overflow-hidden">
+        {resource.fileType === 'pdf' ? (
+          <PdfViewer url={resource.fileUrl} title={resource.title} />
+        ) : (
+          <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
+            <img src={resource.fileUrl} alt={resource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ---- Isolated Upload Modal Component ----
 // Must be outside App to prevent re-renders stealing focus on every keystroke
@@ -723,9 +780,15 @@ export default function App() {
         });
         const data = await res.json();
         if (data.success) {
+            // Update the resource list
             setDbResources(prev => prev.map(r => r.id === resourceId ? data.resource : r));
+            // Update the viewer in-place by merging the updated likes/count — avoids remounting PdfViewer
             if (selectedResource?.id === resourceId) {
-                setSelectedResource(data.resource);
+                setSelectedResource(prev => ({
+                    ...prev,
+                    likes: data.resource.likes,
+                    _count: data.resource._count
+                }));
             }
         }
     } catch(err) {
@@ -1098,52 +1161,14 @@ export default function App() {
             />
         )}
 
-        {/* Full-Page style Resource Viewer */}
+        {/* Resource Viewer — isolated component prevents PDF reload on like */}
         {selectedResource && (
-            <div className="fixed inset-0 z-[200] bg-[#f8fafc] dark:bg-[#0f1219] flex flex-col animate-in slide-in-from-right-8 duration-300">
-                {/* Header matching Screenshot 2 style */}
-                <div className="bg-white dark:bg-[#161923] border-b border-slate-200 dark:border-white/10 px-6 py-4 flex items-center justify-between shrink-0 shadow-sm z-10 gap-4">
-                    <div className="flex-1 flex justify-start">
-                        <button 
-                            onClick={() => setSelectedResource(null)} 
-                            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white font-black text-sm transition-all border border-slate-200 dark:border-white/10 hover:border-slate-300 active:scale-95"
-                        >
-                            <ArrowLeft size={18} /> Back
-                        </button>
-                    </div>
-                    
-                    <h2 className="hidden md:block text-lg lg:text-xl font-black text-slate-900 dark:text-white flex-1 text-center px-4 line-clamp-1">
-                        {selectedResource.title}
-                    </h2>
-                    
-                    <div className="flex-1 flex items-center justify-end gap-2 md:gap-3">
-                        <button 
-                            onClick={() => handleLikeResource(selectedResource.id)} 
-                            className={`flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl text-xs md:text-sm font-black transition-colors ${selectedResource.likes?.some(l => l.userId === user?.id) ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' : 'bg-slate-100 dark:bg-white/5 text-slate-500 border border-slate-200 dark:border-white/10 hover:bg-slate-200'}`}
-                        >
-                            <ThumbsUp size={16} className={selectedResource.likes?.some(l => l.userId === user?.id) ? 'fill-rose-500' : ''} /> {selectedResource._count?.likes || 0}
-                        </button>
-                        <a href={selectedResource.fileUrl} download={selectedResource.title} className="flex items-center gap-2 px-3 py-1.5 md:px-4 md:py-2 rounded-xl bg-blue-600 text-white text-xs md:text-sm font-black hover:bg-blue-500 transition-colors shadow-sm">
-                            Download <UploadCloud size={16} />
-                        </a>
-                    </div>
-                </div>
-
-                {/* Body below header */}
-                <div className="flex-1 w-full overflow-y-auto flex flex-col items-center py-6 md:py-10 px-4 gap-6 custom-scrollbar">
-
-                    {/* Viewer Container */}
-                    <div className="w-full max-w-5xl h-[85vh] bg-white rounded-xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden relative">
-                        {selectedResource.fileType === 'pdf' ? (
-                            <PdfViewer url={selectedResource.fileUrl} title={selectedResource.title} />
-                        ) : (
-                            <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
-                                <img src={selectedResource.fileUrl} alt={selectedResource.title} className="max-w-full h-auto rounded-lg shadow-xl" />
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
+            <ResourceViewerModal
+                resource={selectedResource}
+                user={user}
+                onClose={() => setSelectedResource(null)}
+                onLike={handleLikeResource}
+            />
         )}
       </section>
     );
