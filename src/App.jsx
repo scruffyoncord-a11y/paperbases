@@ -60,6 +60,8 @@ import {
   Trash2,
   ExternalLink,
   Highlighter,
+  Terminal,
+  Wand2,
   Image as ImageIcon,
   ZoomIn,
   ZoomOut,
@@ -142,6 +144,41 @@ const getSubjectColor = (subject) => {
   }
 };
 
+// LaTeX snippets for the playground
+const SNIPPETS = [
+  { label: "Quadratic", val: "\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}" },
+  { label: "Integral", val: "\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}" },
+  { label: "Matrix", val: "\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}" },
+  { label: "Sum", val: "\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}" },
+  { label: "Euler", val: "e^{i\\pi} + 1 = 0" },
+  { label: "Binomial", val: "\\binom{n}{k} = \\frac{n!}{k!(n-k)!}" },
+  { label: "Limit", val: "\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1" },
+  { label: "Maxwell", val: "\\nabla \\cdot \\mathbf{E} = \\frac{\\rho}{\\varepsilon_0}" },
+];
+
+// Custom hook for reliable MathJax loading & configuration
+function useMathJax() {
+  const [ready, setReady] = React.useState(false);
+
+  React.useEffect(() => {
+    if (window.MathJax?.typesetPromise) { setReady(true); return; }
+
+    window.MathJax = {
+      tex: { inlineMath: [["\\(", "\\)"]], displayMath: [["\\[", "\\]"]] },
+      startup: { ready() { window.MathJax.startup.defaultReady(); setReady(true); } },
+    };
+
+    if (!document.querySelector('script[src*="mathjax"]')) {
+      const script = document.createElement("script");
+      script.src = "https://cdnjs.cloudflare.com/ajax/libs/mathjax/3.2.2/es5/tex-chtml.min.js";
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  }, []);
+
+  return ready;
+}
+
 const getStatusColor = (status, repliesCount) => {
   if (status === 'Resolved') return 'border-emerald-200 dark:border-emerald-500/30 text-emerald-600 dark:text-emerald-400';
   if (repliesCount > 0) return 'border-amber-200 dark:border-amber-500/30 text-amber-600 dark:text-amber-400';
@@ -157,34 +194,27 @@ const getStatusText = (status, repliesCount) => {
 // LaTeX Renderer Component with surgical wrapping to preserve spaces
 const Latex = ({ children, inline = true }) => {
   const nodeRef = React.useRef(null);
+  const mjReady = useMathJax();
 
   React.useEffect(() => {
-    if (nodeRef.current && window.MathJax && window.MathJax.typesetPromise) {
+    if (mjReady && nodeRef.current && window.MathJax?.typesetPromise) {
       window.MathJax.typesetPromise([nodeRef.current]).catch(err => console.error("MathJax error:", err));
     }
-  }, [children]);
+  }, [children, mjReady]);
 
   const content = String(children || "");
   
-  // If there are no spaces, we can safely wrap the whole thing if it has math cues
   if (!content.includes(" ") && /[\\]|[\^]|[_]|[{]|[}]|[$]|[=]|[\≠]|[>]|[<]|[\+\-\*\/]/.test(content)) {
     const wrapped = inline ? `\\(${content}\\)` : `\\[${content}\\]`;
     return <span ref={nodeRef} className="latex-content">{wrapped}</span>;
   }
 
-  // If there ARE spaces, we split and wrap segments surgically
-  // This prevents MathJax from stripping spaces between English words
   const parts = content.split(/(\s+)/);
   const elements = parts.map((part, i) => {
-    if (part.trim() === "") return part; // Keep spaces as-is
-    
-    // Check if this word looks like math (has symbols OR mix of digits and letters)
+    if (part.trim() === "") return part;
     const isMath = /[\\]|[\^]|[_]|[{]|[}]|[$]|[=]|[\≠]|[>]|[<]|[\+\-\*\/]/.test(part) || 
                    (/[a-zA-Z]/.test(part) && /\d/.test(part));
-                   
-    if (isMath) {
-      return inline ? `\\(${part}\\)` : `\\[${part}\\]`;
-    }
+    if (isMath) return inline ? `\\(${part}\\)` : `\\[${part}\\]`;
     return part;
   });
 
@@ -192,6 +222,109 @@ const Latex = ({ children, inline = true }) => {
     <span ref={nodeRef} className="latex-content">
       {elements.join("")}
     </span>
+  );
+};
+
+// Interactive LaTeX Playground Component
+const LatexPlayground = () => {
+  const [input, setInput] = React.useState("e^{i\\pi} + 1 = 0");
+  const [mode, setMode] = React.useState("block");
+  const previewRef = React.useRef(null);
+  const debounceRef = React.useRef(null);
+  const mjReady = useMathJax();
+
+  const renderMath = React.useCallback(() => {
+    if (!previewRef.current || !window.MathJax?.typesetPromise) return;
+    const wrapped = mode === "block" ? `\\[${input}\\]` : `\\(${input}\\)`;
+    previewRef.current.innerHTML = wrapped;
+    window.MathJax.typesetPromise([previewRef.current]).catch(err => console.error("Playground error:", err));
+  }, [input, mode]);
+
+  React.useEffect(() => {
+    if (!mjReady) return;
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(renderMath, 180);
+    return () => clearTimeout(debounceRef.current);
+  }, [input, mode, mjReady, renderMath]);
+
+  return (
+    <div className="animate-in fade-in zoom-in duration-500">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div>
+                <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2">Math Tools</h2>
+                <p className="text-sm text-slate-500 dark:text-slate-400">Draft complex equations with live preview and snippets.</p>
+            </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="space-y-6">
+                <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-8 shadow-xl">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="w-10 h-10 bg-blue-500/10 rounded-2xl flex items-center justify-center">
+                            <Terminal size={20} className="text-blue-500" />
+                        </div>
+                        <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">LaTeX Input</h3>
+                    </div>
+                    
+                    <textarea
+                        value={input}
+                        onChange={(e) => setInput(e.target.value)}
+                        placeholder="Type LaTeX here..."
+                        className="w-full h-48 bg-slate-50 dark:bg-[#0B0E14] text-slate-900 dark:text-slate-100 p-6 rounded-3xl border border-slate-200 dark:border-white/5 outline-none focus:border-blue-500/50 transition-all font-mono text-sm leading-relaxed"
+                    />
+
+                    <div className="flex flex-wrap gap-2 mt-6">
+                        {SNIPPETS.map((s) => (
+                            <button 
+                                key={s.label} 
+                                onClick={() => setInput(s.val)}
+                                className="px-3 py-1.5 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-500 hover:border-blue-500/30 transition-all"
+                            >
+                                {s.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-4 bg-white/50 dark:bg-white/5 p-4 rounded-3xl border border-slate-100 dark:border-white/5">
+                    <span className="text-xs font-black text-slate-400 uppercase ml-2">Display Mode:</span>
+                    <button 
+                        onClick={() => setMode('block')}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mode === 'block' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-400'}`}
+                    >
+                        Block
+                    </button>
+                    <button 
+                        onClick={() => setMode('inline')}
+                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mode === 'inline' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-400'}`}
+                    >
+                        Inline
+                    </button>
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-[#161923] border border-blue-500/20 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
+                    <Wand2 size={120} className="text-blue-500" />
+                </div>
+                
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
+                        <Sparkles size={20} className="text-emerald-500" />
+                    </div>
+                    <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Preview</h3>
+                </div>
+
+                <div className="min-h-[200px] flex items-center justify-center text-center">
+                    {!input.trim() ? (
+                        <p className="text-slate-400 italic">Rendered equation will appear here...</p>
+                    ) : (
+                        <div ref={previewRef} className="text-2xl text-slate-800 dark:text-slate-100" />
+                    )}
+                </div>
+            </div>
+        </div>
+    </div>
   );
 };
 
@@ -1856,6 +1989,7 @@ export default function App() {
             <SidebarItem icon={<Layers size={20} />} label={<span className="flex items-center gap-2">Resources <Sparkles size={14} className="text-amber-500 dark:text-amber-400 fill-amber-500 dark:fill-amber-400 animate-pulse" /></span>} active={activeTab === 'Resources'} onClick={() => setActiveTab('Resources')} />
             <SidebarItem icon={<ListChecks size={20} />} label="Syllabus" active={activeTab === 'Syllabus'} onClick={() => setActiveTab('Syllabus')} />
             <SidebarItem icon={<Users size={20} />} label="Community" active={activeTab === 'Community'} onClick={() => setActiveTab('Community')} />
+            <SidebarItem icon={<Wand2 size={20} />} label="Playground" active={activeTab === 'Playground'} onClick={() => setActiveTab('Playground')} />
           </nav>
           <div className="p-4 space-y-2 border-t border-slate-200 dark:border-white/5">
             <div onClick={toggleTheme} className="flex items-center gap-3 px-4 py-3 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-white/10 select-none">
@@ -1888,6 +2022,8 @@ export default function App() {
             </div>
           </header>
 
+          {activeTab === 'Playground' && <LatexPlayground />}
+          
           {activeTab === 'Home' && (
             <div className="animate-in fade-in slide-in-from-top-4 duration-700 mb-10 pb-10 border-b border-slate-200 dark:border-white/10">
               <div className="mb-8 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
