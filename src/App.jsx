@@ -164,9 +164,10 @@ const Latex = ({ children, inline = true }) => {
     }
   }, [children]);
 
-  // Wrap in delimiters if not already present
-  const content = children || "";
-  const needsWrapping = !content.includes('\\(') && !content.includes('\\[') && !content.includes('$');
+  // Wrap in delimiters if not already present, but ONLY if it looks like LaTeX/Math
+  const content = String(children || "");
+  const hasMathCues = /[\\]|[\^]|[_]|[{]|[}]|[$]/.test(content);
+  const needsWrapping = hasMathCues && !content.includes('\\(') && !content.includes('\\[') && !content.includes('$');
   const wrapped = needsWrapping ? (inline ? `\\(${content}\\)` : `\\[${content}\\]`) : content;
 
   return (
@@ -403,9 +404,9 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                     url={resource.fileUrl} 
                     title={resource.title} 
                     highlights={highlights} 
-                    onHighlight={(content, position) => {
-                        setPendingSelection({ content, position });
-                    }} 
+                    onHighlight={(content, position, color) => {
+                        handleHighlight(content, position, color || 'yellow');
+                    }}
                 />
             ) : (
                 <div className="w-full h-full overflow-auto flex items-center justify-center p-4 bg-[#0f1219]">
