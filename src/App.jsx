@@ -154,7 +154,7 @@ const getStatusText = (status, repliesCount) => {
   return 'Unanswered';
 };
 
-// LaTeX Renderer Component
+// LaTeX Renderer Component with surgical wrapping to preserve spaces
 const Latex = ({ children, inline = true }) => {
   const nodeRef = React.useRef(null);
 
@@ -164,15 +164,33 @@ const Latex = ({ children, inline = true }) => {
     }
   }, [children]);
 
-  // Wrap in delimiters if not already present, but ONLY if it looks like LaTeX/Math
   const content = String(children || "");
-  const hasMathCues = /[\\]|[\^]|[_]|[{]|[}]|[$]|[=]|[\≠]|[>]|[<]/.test(content);
-  const needsWrapping = hasMathCues && !content.includes('\\(') && !content.includes('\\[') && !content.includes('$');
-  const wrapped = needsWrapping ? (inline ? `\\(${content}\\)` : `\\[${content}\\]`) : content;
+  
+  // If there are no spaces, we can safely wrap the whole thing if it has math cues
+  if (!content.includes(" ") && /[\\]|[\^]|[_]|[{]|[}]|[$]|[=]|[\≠]|[>]|[<]|[\+\-\*\/]/.test(content)) {
+    const wrapped = inline ? `\\(${content}\\)` : `\\[${content}\\]`;
+    return <span ref={nodeRef} className="latex-content">{wrapped}</span>;
+  }
+
+  // If there ARE spaces, we split and wrap segments surgically
+  // This prevents MathJax from stripping spaces between English words
+  const parts = content.split(/(\s+)/);
+  const elements = parts.map((part, i) => {
+    if (part.trim() === "") return part; // Keep spaces as-is
+    
+    // Check if this word looks like math (has symbols OR mix of digits and letters)
+    const isMath = /[\\]|[\^]|[_]|[{]|[}]|[$]|[=]|[\≠]|[>]|[<]|[\+\-\*\/]/.test(part) || 
+                   (/[a-zA-Z]/.test(part) && /\d/.test(part));
+                   
+    if (isMath) {
+      return inline ? `\\(${part}\\)` : `\\[${part}\\]`;
+    }
+    return part;
+  });
 
   return (
     <span ref={nodeRef} className="latex-content">
-      {wrapped}
+      {elements.join("")}
     </span>
   );
 };
@@ -773,12 +791,17 @@ export default function App() {
             .catch(console.error);
       }
       
-      if (doubts.length === 0) {
-        fetch('/api/doubts')
-            .then(res => res.json())
-            .then(data => { if (data.success) setDoubts(data.doubts); })
-            .catch(console.error);
-      }
+      const prefetchDoubts = async () => {
+        try {
+          const res = await fetch('/api/doubts');
+          const data = await res.json();
+          if (data.success) setDoubts(data.doubts);
+        } catch (err) {
+          console.error('Failed to prefetch doubts:', err);
+        }
+      };
+      
+      if (doubts.length === 0) prefetchDoubts();
 
       if (highlights.length === 0) {
         fetch(`/api/highlights/${user.id}`)

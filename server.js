@@ -272,6 +272,8 @@ app.get('/api/doubts', async (req, res) => {
         userId: true,
         subject: true,
         title: true,
+        content: true,
+        imageUrl: true,
         status: true,
         createdAt: true,
         updatedAt: true,
