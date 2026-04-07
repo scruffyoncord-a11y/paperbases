@@ -226,6 +226,128 @@ const PdfViewer = ({ url, title }) => {
   );
 };
 
+// ---- Isolated Upload Modal Component ----
+// Must be outside App to prevent re-renders stealing focus on every keystroke
+function UploadResourceModal({ onClose, onUpload, syllabusMode, modeSubjects }) {
+  const [localFile, setLocalFile] = React.useState(null);
+  const [isUploading, setIsUploading] = React.useState(false);
+  const [title, setTitle] = React.useState('');
+  const [subject, setSubject] = React.useState('');
+  const [tag, setTag] = React.useState('');
+  const [description, setDescription] = React.useState('');
+
+  const subjects = (modeSubjects && syllabusMode && modeSubjects[syllabusMode]) ? modeSubjects[syllabusMode] : ['Physics', 'Chemistry', 'Maths', 'Biology'];
+  const effectiveSubject = subject || subjects[0];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!title.trim()) return alert('Please enter a title.');
+    if (!localFile) return alert('Please select a file.');
+    setIsUploading(true);
+    try {
+      await onUpload({ title, subject: effectiveSubject, tag, description, file: localFile });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+      <div className="bg-white dark:bg-[#161923] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden">
+        <div className="p-8 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
+          <div>
+            <h3 className="text-xl font-black text-slate-900 dark:text-white">Share Resource</h3>
+            <p className="text-xs text-slate-500">Upload PDFs or revision notes.</p>
+          </div>
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center hover:bg-slate-200 transition-colors"><X size={20} /></button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-8 space-y-5 max-h-[75vh] overflow-y-auto">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Title</label>
+            <input
+              type="text"
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              placeholder="e.g. Physics Formula Sheet"
+              className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Subject</label>
+            <select
+              value={effectiveSubject}
+              onChange={e => setSubject(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm dark:text-white font-semibold"
+            >
+              {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tag Category</label>
+            <select
+              value={tag}
+              onChange={e => setTag(e.target.value)}
+              className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm dark:text-white font-semibold"
+            >
+              <option value="">None</option>
+              <option value="Formula Sheet">Formula Sheet</option>
+              <option value="PYQ Solutions">PYQ Solutions</option>
+              <option value="Handwritten Notes">Handwritten Notes</option>
+              <option value="Mind Map">Mind Map</option>
+              <option value="Mocks">Mock Test</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Description</label>
+            <textarea
+              rows="2"
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="What is inside this resource?"
+              className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm resize-none dark:text-white"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">File (PDF or Image)</label>
+            <div className="relative group cursor-pointer text-center">
+              <input
+                type="file"
+                accept=".pdf,image/*"
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                onChange={e => setLocalFile(e.target.files[0])}
+              />
+              <div className={`border-2 border-dashed rounded-2xl p-6 transition-all flex flex-col items-center ${localFile ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-500/10' : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 group-hover:border-blue-500'}`}>
+                {localFile ? (
+                  <>
+                    <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center mb-2 shadow-lg shadow-blue-600/20">
+                      <FileText size={24} />
+                    </div>
+                    <span className="text-sm font-bold text-blue-600 dark:text-blue-400 truncate max-w-[220px]">{localFile.name}</span>
+                    <span className="text-[10px] text-slate-400 mt-1 uppercase font-black tracking-widest">Click to change</span>
+                  </>
+                ) : (
+                  <>
+                    <UploadCloud size={32} className="text-slate-300 group-hover:text-blue-500" />
+                    <span className="text-xs text-slate-400 mt-2">Click or drag &amp; drop</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={isUploading}
+            className="w-full py-4 rounded-2xl bg-blue-600 text-white font-black shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+          >
+            {isUploading ? <Sparkles className="animate-spin" /> : <Upload size={20} />}
+            {isUploading ? 'UPLOADING...' : 'PUBLISH RESOURCE'}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(() => {
     try {
@@ -279,10 +401,6 @@ export default function App() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [resourceFile, setResourceFile] = useState(null);
-  const [resourceTitle, setResourceTitle] = useState('');
-  const [resourceSubject, setResourceSubject] = useState('');
-  const [resourceTag, setResourceTag] = useState('');
-  const [resourceDescription, setResourceDescription] = useState('');
 
   // Compute current syllabus (DB version or default)
   // Simplified Syllabus
@@ -556,57 +674,43 @@ export default function App() {
     }
   };
 
-  const handleUploadResource = async (e) => {
-    e.preventDefault();
-    if (!user) return alert('Please login to upload.');
-    setIsUploadingResource(true);
-    if (!resourceFile) {
-        alert('Please select a file.');
-        setIsUploadingResource(false);
-        return;
-    }
-    const title = resourceTitle;
-    const description = resourceDescription;
-    const subject = resourceSubject || modeSubjects[syllabusMode][0];
-    const tag = resourceTag;
-    const file = resourceFile;
-
-    const reader = new FileReader();
-    reader.onloadend = async () => {
+  const handleUploadResource = async ({ title, subject, tag, description, file }) => {
+    if (!user) { alert('Please login to upload.'); return; }
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
         try {
-            const res = await fetch('/api/resources', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId: user.id,
-                    title,
-                    description,
-                    subject,
-                    tag,
-                    fileUrl: reader.result,
-                    fileType: file.type.includes('pdf') ? 'pdf' : 'image'
-                })
-            });
-            const data = await res.json();
-            if (data.success) {
-                setDbResources(prev => [data.resource, ...prev]);
-                setResourceFile(null);
-                setResourceTitle('');
-                setResourceDescription('');
-                setResourceTag('');
-                setShowUploadModal(false);
-                e.target.reset();
-                alert('Resource published successfully!');
-            } else {
-                alert('Upload failed: ' + (data.message || 'Unknown error'));
-            }
+          const res = await fetch('/api/resources', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              userId: user.id,
+              title,
+              description,
+              subject,
+              tag,
+              fileUrl: reader.result,
+              fileType: file.type.includes('pdf') ? 'pdf' : 'image'
+            })
+          });
+          const data = await res.json();
+          if (data.success) {
+            setDbResources(prev => [data.resource, ...prev]);
+            setShowUploadModal(false);
+            alert('Resource published successfully!');
+            resolve();
+          } else {
+            alert('Upload failed: ' + (data.message || 'Unknown error'));
+            reject();
+          }
         } catch (err) {
-            console.error(err);
-            alert('Upload error: ' + err.message);
+          console.error(err);
+          alert('Upload error: ' + err.message);
+          reject();
         }
-        setIsUploadingResource(false);
-    };
-    reader.readAsDataURL(file);
+      };
+      reader.readAsDataURL(file);
+    });
   };
 
   const handleLikeResource = async (resourceId) => {
@@ -984,107 +1088,14 @@ export default function App() {
           </button>
         </div>
 
-        {/* Upload Modal */}
+        {/* Upload Modal — isolated component so typing doesn't lose focus */}
         {showUploadModal && (
-            <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
-                <div className="bg-white dark:bg-[#161923] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/10 overflow-hidden animate-in slide-in-from-bottom-8 duration-500">
-                    <div className="p-8 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
-                        <div>
-                            <h3 className="text-xl font-black text-slate-900 dark:text-white">Share Resource</h3>
-                            <p className="text-xs text-slate-500">Upload PDFs or revision notes.</p>
-                        </div>
-                        <button onClick={() => setShowUploadModal(false)} className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center hover:bg-slate-200 transition-colors"><X size={20} /></button>
-                    </div>
-                    <form onSubmit={handleUploadResource} className="p-8 space-y-5">
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Title</label>
-                            <input 
-                                name="title" 
-                                required 
-                                value={resourceTitle}
-                                onChange={(e) => setResourceTitle(e.target.value)}
-                                placeholder="e.g. Physics Formula Sheet" 
-                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm" 
-                            />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Subject</label>
-                            <select 
-                                name="subject" 
-                                required 
-                                value={resourceSubject || (modeSubjects[syllabusMode] ? modeSubjects[syllabusMode][0] : '')}
-                                onChange={(e) => setResourceSubject(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm font-bold"
-                            >
-                                {modeSubjects[syllabusMode].map(sub => <option key={sub} value={sub}>{sub}</option>)}
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tag Category</label>
-                            <select 
-                                name="tag" 
-                                value={resourceTag}
-                                onChange={(e) => setResourceTag(e.target.value)}
-                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm text-slate-600 dark:text-slate-300 font-bold"
-                            >
-                                <option value="">None</option>
-                                <option value="Formula Sheet">Formula Sheet</option>
-                                <option value="PYQ Solutions">PYQ Solutions</option>
-                                <option value="Handwritten Notes">Handwritten Notes</option>
-                                <option value="Mind Map">Mind Map</option>
-                                <option value="Mocks">Mock Test</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Description</label>
-                            <textarea 
-                                name="description" 
-                                rows="3" 
-                                value={resourceDescription}
-                                onChange={(e) => setResourceDescription(e.target.value)}
-                                placeholder="What is inside this resource?" 
-                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm resize-none"
-                            ></textarea>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">File (PDF or Image)</label>
-                            <div className="relative group cursor-pointer text-center">
-                                <input 
-                                    type="file" 
-                                    name="file" 
-                                    required 
-                                    accept=".pdf,image/*" 
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" 
-                                    onChange={(e) => setResourceFile(e.target.files[0])}
-                                />
-                                <div className={`border-2 border-dashed rounded-2xl p-6 transition-all flex flex-col items-center ${resourceFile ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-500/10' : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-black/20 group-hover:border-blue-500'}`}>
-                                    {resourceFile ? (
-                                        <>
-                                            <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center mb-2 shadow-lg shadow-blue-600/20">
-                                                <FileText size={24} />
-                                            </div>
-                                            <span className="text-sm font-bold text-blue-600 dark:text-blue-400 truncate max-w-[200px]">{resourceFile.name}</span>
-                                            <span className="text-[10px] text-slate-400 mt-1 uppercase font-black tracking-widest">Click to change</span>
-                                        </>
-                                    ) : (
-                                        <>
-                                            <UploadCloud size={32} className="text-slate-300 group-hover:text-blue-500" />
-                                            <span className="text-xs text-slate-400 mt-2">Click or drag & drop</span>
-                                        </>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        <button 
-                            disabled={isUploadingResource}
-                            className="w-full py-4 rounded-2xl bg-blue-600 text-white font-black shadow-xl shadow-blue-600/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 flex items-center justify-center gap-3"
-                        >
-                            {isUploadingResource ? <Sparkles className="animate-spin" /> : <Upload size={20} />}
-                            {isUploadingResource ? 'UPLOADING...' : 'PUBLISH RESOURCE'}
-                        </button>
-                    </form>
-                </div>
-            </div>
+            <UploadResourceModal
+                onClose={() => setShowUploadModal(false)}
+                onUpload={handleUploadResource}
+                syllabusMode={syllabusMode}
+                modeSubjects={modeSubjects}
+            />
         )}
 
         {/* Full-Page style Resource Viewer */}
