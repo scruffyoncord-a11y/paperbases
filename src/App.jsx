@@ -279,6 +279,10 @@ export default function App() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [resourceFile, setResourceFile] = useState(null);
+  const [resourceTitle, setResourceTitle] = useState('');
+  const [resourceSubject, setResourceSubject] = useState('');
+  const [resourceTag, setResourceTag] = useState('');
+  const [resourceDescription, setResourceDescription] = useState('');
 
   // Compute current syllabus (DB version or default)
   // Simplified Syllabus
@@ -556,18 +560,16 @@ export default function App() {
     e.preventDefault();
     if (!user) return alert('Please login to upload.');
     setIsUploadingResource(true);
-    const formData = new FormData(e.target);
-    const title = formData.get('title');
-    const description = formData.get('description');
-    const subject = formData.get('subject');
-    const tag = formData.get('tag'); // Get tag
-    const file = formData.get('file');
-
-    if (!file || !file.name) {
+    if (!resourceFile) {
         alert('Please select a file.');
         setIsUploadingResource(false);
         return;
     }
+    const title = resourceTitle;
+    const description = resourceDescription;
+    const subject = resourceSubject || modeSubjects[syllabusMode][0];
+    const tag = resourceTag;
+    const file = resourceFile;
 
     const reader = new FileReader();
     reader.onloadend = async () => {
@@ -589,6 +591,9 @@ export default function App() {
             if (data.success) {
                 setDbResources(prev => [data.resource, ...prev]);
                 setResourceFile(null);
+                setResourceTitle('');
+                setResourceDescription('');
+                setResourceTag('');
                 setShowUploadModal(false);
                 e.target.reset();
                 alert('Resource published successfully!');
@@ -993,17 +998,35 @@ export default function App() {
                     <form onSubmit={handleUploadResource} className="p-8 space-y-5">
                         <div>
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Title</label>
-                            <input name="title" required placeholder="e.g. Physics Formula Sheet" className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm" />
+                            <input 
+                                name="title" 
+                                required 
+                                value={resourceTitle}
+                                onChange={(e) => setResourceTitle(e.target.value)}
+                                placeholder="e.g. Physics Formula Sheet" 
+                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm" 
+                            />
                         </div>
                         <div>
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Subject</label>
-                            <select name="subject" required className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm">
+                            <select 
+                                name="subject" 
+                                required 
+                                value={resourceSubject || (modeSubjects[syllabusMode] ? modeSubjects[syllabusMode][0] : '')}
+                                onChange={(e) => setResourceSubject(e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm font-bold"
+                            >
                                 {modeSubjects[syllabusMode].map(sub => <option key={sub} value={sub}>{sub}</option>)}
                             </select>
                         </div>
                         <div>
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Tag Category</label>
-                            <select name="tag" className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm text-slate-600 dark:text-slate-300">
+                            <select 
+                                name="tag" 
+                                value={resourceTag}
+                                onChange={(e) => setResourceTag(e.target.value)}
+                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm text-slate-600 dark:text-slate-300 font-bold"
+                            >
                                 <option value="">None</option>
                                 <option value="Formula Sheet">Formula Sheet</option>
                                 <option value="PYQ Solutions">PYQ Solutions</option>
@@ -1014,7 +1037,14 @@ export default function App() {
                         </div>
                         <div>
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">Description</label>
-                            <textarea name="description" rows="3" placeholder="What is inside this resource?" className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm resize-none"></textarea>
+                            <textarea 
+                                name="description" 
+                                rows="3" 
+                                value={resourceDescription}
+                                onChange={(e) => setResourceDescription(e.target.value)}
+                                placeholder="What is inside this resource?" 
+                                className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/10 rounded-xl px-4 py-3 outline-none focus:border-blue-500 text-sm resize-none"
+                            ></textarea>
                         </div>
                         <div>
                             <label className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">File (PDF or Image)</label>
