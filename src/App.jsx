@@ -149,32 +149,55 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
   React.useEffect(() => {
     let isMounted = true;
     const loadPdf = async () => {
-      // Set worker source for pdf.js
+      // Wait for library to load if needed
+      if (!window.pdfjsLib) {
+          let retries = 0;
+          while (!window.pdfjsLib && retries < 50) {
+              await new Promise(r => setTimeout(r, 100));
+              retries++;
+          }
+      }
+      if (!window.pdfjsLib) {
+          setError(true);
+          return;
+      }
+
       window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       
       setIsLoading(true);
       setError(false);
       try {
-        const loadingTask = window.pdfjsLib.getDocument(url);
+        let pdfData = url;
+        // Handle Base64 strings correctly for pdf.js
+        if (url.startsWith('data:application/pdf;base64,')) {
+            const base64Data = url.split(',')[1];
+            const binaryString = window.atob(base64Data);
+            const bytes = new Uint8Array(binaryString.length);
+            for (let i = 0; i < binaryString.length; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            pdfData = { data: bytes };
+        }
+
+        const loadingTask = window.pdfjsLib.getDocument(pdfData);
         const pdf = await loadingTask.promise;
         if (!isMounted) return;
         setNumPages(pdf.numPages);
         
-        // Render all pages
         const container = containerRef.current;
-        container.innerHTML = ''; // Clear previous
+        if (!container) return;
+        container.innerHTML = ''; 
         
         for (let i = 1; i <= pdf.numPages; i++) {
           const page = await pdf.getPage(i);
           const viewport = page.getViewport({ scale: 1.5 });
           
           const pageWrapper = document.createElement('div');
-          pageWrapper.className = 'relative mb-8 mx-auto shadow-2xl bg-white page-container';
+          pageWrapper.className = 'relative mb-8 mx-auto shadow-2xl bg-white page-container min-h-[500px]';
           pageWrapper.style.width = `${viewport.width}px`;
           pageWrapper.style.height = `${viewport.height}px`;
-          pageWrapper.dataset.page = i - 1; // 0-indexed
+          pageWrapper.dataset.page = i - 1; 
           
-          // Canvas layer
           const canvas = document.createElement('canvas');
           canvas.className = 'absolute inset-0';
           const context = canvas.getContext('2d');
@@ -182,7 +205,6 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
           canvas.width = viewport.width;
           await page.render({ canvasContext: context, viewport }).promise;
           
-          // Text layer (for selection)
           const textLayer = document.createElement('div');
           textLayer.className = 'absolute inset-0 textLayer opacity-20 hover:opacity-100 transition-opacity';
           const textContent = await page.getTextContent();
