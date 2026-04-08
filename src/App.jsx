@@ -442,6 +442,50 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
   );
 });
 
+// Simple Markdown renderer for PaperAI chat messages
+function renderMarkdown(text) {
+  if (!text) return '';
+  let html = text
+    // Escape HTML first
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    // Code blocks (```)
+    .replace(/```([\s\S]*?)```/g, '<pre class="bg-slate-200 dark:bg-white/10 rounded-lg p-3 my-2 overflow-x-auto text-[11px] font-mono"><code>$1</code></pre>')
+    // Inline code
+    .replace(/`([^`]+)`/g, '<code class="bg-slate-200 dark:bg-white/10 px-1.5 py-0.5 rounded text-[11px] font-mono">$1</code>')
+    // Headers
+    .replace(/^### (.+)$/gm, '<h4 class="font-black text-sm text-slate-900 dark:text-white mt-3 mb-1">$1</h4>')
+    .replace(/^## (.+)$/gm, '<h3 class="font-black text-[15px] text-slate-900 dark:text-white mt-4 mb-1.5">$1</h3>')
+    .replace(/^# (.+)$/gm, '<h3 class="font-black text-[15px] text-slate-900 dark:text-white mt-4 mb-1.5">$1</h3>')
+    // Bold + Italic
+    .replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>')
+    // Bold
+    .replace(/\*\*(.+?)\*\*/g, '<strong class="text-slate-900 dark:text-white">$1</strong>')
+    // Italic
+    .replace(/\*(.+?)\*/g, '<em>$1</em>')
+    // Unordered lists
+    .replace(/^[\-\*] (.+)$/gm, '<li class="ml-4 mb-0.5 list-disc">$1</li>')
+    // Ordered lists
+    .replace(/^\d+\. (.+)$/gm, '<li class="ml-4 mb-0.5 list-decimal">$1</li>')
+    // Horizontal rules
+    .replace(/^---$/gm, '<hr class="border-slate-200 dark:border-white/10 my-3" />')
+    // Links
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-violet-500 hover:underline">$1</a>')
+    // LaTeX display math \[...\]
+    .replace(/\\\[([\\s\\S]*?)\\\]/g, '<div class="latex-content my-2">\\[$1\\]</div>')
+    // LaTeX inline math \(...\)
+    .replace(/\\\((.+?)\\\)/g, '<span class="latex-content">\\($1\\)</span>')
+    // Double newline -> paragraph break
+    .replace(/\n\n/g, '</p><p class="mb-2">')
+    // Single newline -> line break
+    .replace(/\n/g, '<br/>');
+
+  html = '<p class="mb-2">' + html + '</p>';
+  html = html.replace(/<p class="mb-2"><\/p>/g, '');
+  return html;
+}
+
 // ---- Isolated Resource Viewer Modal ----
 // Kept outside App so likes/state changes don't remount PdfViewer
 function ResourceViewerModal({ resource: initialResource, user, onClose, onLike }) {
@@ -738,8 +782,8 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                       <div className="space-y-2 w-full">
                         {[
                           'Summarize this document',
-                          'Explain my highlighted sections',
-                          'What are the key concepts?',
+                          highlights.length > 0 ? `Explain highlight #1` : 'What are the key concepts?',
+                          'Give me practice questions',
                         ].map(suggestion => (
                           <button
                             key={suggestion}
@@ -775,9 +819,10 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                         }`}
                       >
                         {msg.role === 'assistant' ? (
-                          <div className="prose-sm prose-slate dark:prose-invert max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:mb-1 [&_code]:bg-slate-200 [&_code]:dark:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[11px] [&_strong]:text-slate-900 [&_strong]:dark:text-white whitespace-pre-wrap">
-                            {msg.content}
-                          </div>
+                          <div 
+                            className="prose-sm prose-slate dark:prose-invert max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:mb-1 [&_code]:bg-slate-200 [&_code]:dark:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[11px] [&_strong]:text-slate-900 [&_strong]:dark:text-white"
+                            dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
+                          />
                         ) : (
                           <span className="font-medium">{msg.content}</span>
                         )}
@@ -881,18 +926,29 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                             <p className="text-[10px] text-slate-400 leading-relaxed">Select text in the PDF to start your active study session.</p>
                         </div>
                     )}
-                    {highlights.map(h => (
+                    {highlights.map((h, idx) => (
                         <div key={h.id} className="bg-white dark:bg-[#0B0E14] p-4 rounded-2xl border border-slate-200 dark:border-white/5 group shadow-sm hover:shadow-md transition-all active:scale-[0.98]">
                             <div className="flex justify-between items-center mb-3">
-                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
-                                    h.color === 'green' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' :
-                                    h.color === 'blue' ? 'text-sky-600 dark:text-sky-400 bg-sky-500/10' :
-                                    h.color === 'pink' ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10' :
-                                    'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10'
-                                }`}>Page {h.pageIndex + 1}</span>
-                                <button onClick={() => deleteHighlight(h.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12} /></button>
+                                <div className="flex items-center gap-2">
+                                    <span className="w-6 h-6 rounded-lg bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center text-white text-[10px] font-black shadow-sm">#{idx + 1}</span>
+                                    <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                                        h.color === 'green' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' :
+                                        h.color === 'blue' ? 'text-sky-600 dark:text-sky-400 bg-sky-500/10' :
+                                        h.color === 'pink' ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10' :
+                                        'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10'
+                                    }`}>Page {h.pageIndex + 1}</span>
+                                </div>
+                                <div className="flex items-center gap-1.5">
+                                    <button 
+                                        onClick={() => { setSidebarTab('chat'); setChatInput(`Explain highlight #${idx + 1}`); setTimeout(() => chatInputRef.current?.focus(), 100); }}
+                                        className="text-[9px] font-black text-violet-500 bg-violet-500/10 px-2 py-1 rounded-lg opacity-0 group-hover:opacity-100 transition-all hover:bg-violet-500/20 uppercase tracking-wider"
+                                    >
+                                        Explain
+                                    </button>
+                                    <button onClick={() => deleteHighlight(h.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12} /></button>
+                                </div>
                             </div>
-                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-relaxed">
+                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-relaxed line-clamp-4">
                                 <Latex>{h.text}</Latex>
                             </p>
                         </div>

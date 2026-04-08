@@ -844,7 +844,7 @@ app.post('/api/ai/chat', async (req, res) => {
     const { resource, text: documentText } = await getResourceTextContent(resourceIdInt);
 
     const highlightsContext = highlights.length > 0
-      ? highlights.map((h, i) => `[Highlight ${i + 1}, Page ${h.pageIndex + 1}, ${h.color}]: "${h.text}"`).join('\n')
+      ? highlights.map((h, i) => `[#${i + 1}, Page ${h.pageIndex + 1}]: "${h.text?.substring(0, 200)}${(h.text?.length || 0) > 200 ? '...' : ''}"`).join('\n')
       : 'No highlights saved yet.';
 
     const docContext = documentText
@@ -863,23 +863,22 @@ app.post('/api/ai/chat', async (req, res) => {
       content: m.content,
     }));
 
-    const systemPrompt = `You are PaperAI, an advanced AI study assistant embedded inside a PDF viewer. Your role is to help students deeply understand their study materials.
+    const systemPrompt = `You are PaperAI, an AI study assistant inside a PDF viewer. Help students understand their materials.
 
-You have access to the following context:
-
-**Document**: "${resource?.title || 'Unknown'}"
-**Subject**: ${resource?.subject || 'General'}
-
-**Student's Saved Highlights**:
+Context:
+- Document: "${resource?.title || 'Unknown'}" (${resource?.subject || 'General'})
+- Student's highlights (numbered to match their sidebar):
 ${highlightsContext}
 ${docContext}
 
-**Guidelines**:
-- Be concise, accurate, and educational.
-- Reference specific highlights when relevant by quoting them.
-- Use LaTeX notation (e.g., \\(E = mc^2\\)) for mathematical expressions.
-- If you don't have enough context, say so honestly.
-- Format responses with markdown: use **bold**, *italic*, bullet points, and numbered lists.`;
+RULES:
+1. NEVER repeat or echo the highlighted text back. The student can already see it. Jump straight to explanation.
+2. When the student says "explain highlight #N", look up highlight #N from the list above and explain the concept directly.
+3. Be concise and educational. Use bullet points for clarity.
+4. Use LaTeX for math: \\(inline\\) and \\[display\\] notation.
+5. If quoting a highlight, use only a short phrase, not the full text.
+6. Format with markdown: **bold**, *italic*, bullet points, numbered lists.
+7. Keep responses focused — aim for 200-400 words unless more detail is requested.`;
 
     // Check if API key exists
     if (!process.env.DEEPSEEK_API_KEY) {
