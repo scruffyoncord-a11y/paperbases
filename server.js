@@ -6,6 +6,8 @@ import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import OpenAI from 'openai';
+import { extractTextFromPdf } from './server/pdf_service.js';
 
 dotenv.config();
 
@@ -753,6 +755,247 @@ app.post('/api/schedule', async (req, res) => {
     res.json({ success: true, schedule });
   } catch (error) {
     console.error('Error adding schedule:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// --- PaperAI Chat API ---
+
+// DeepSeek client (OpenAI-compatible)
+const deepseek = new OpenAI({
+  baseURL: 'https://api.deepseek.com',
+  apiKey: process.env.DEEPSEEK_API_KEY || '',
+});
+
+// Helper: get or extract text content for a resource
+async function getResourceTextContent(resourceId) {
+  const resource = await prisma.resource.findUnique({ where: { id: resourceId } });
+  if (!resource) return { resource: null, text: '' };
+
+  // Return cached text if available
+  if (resource.textContent) return { resource, text: resource.textContent };
+
+  // Only extract for PDFs
+  if (resource.fileType !== 'pdf' || !resource.fileUrl) return { resource, text: '' };
+
+  try {
+    const extractedText = await extractTextFromPdf(resource.fileUrl, { maxPages: 10 });
+    if (extractedText) {
+      // Cache for future requests
+      await prisma.resource.update({
+        where: { id: resourceId },
+        data: { textContent: extractedText },
+      });
+    }
+    return { resource, text: extractedText };
+  } catch (err) {
+    console.error('Text extraction failed:', err);
+    return { resource, text: '' };
+  }
+}
+
+// POST /api/ai/chat — Send a message to PaperAI
+app.post('/api/ai/chat', async (req, res) => {
+  const { userId, resourceId, message, chatId } = req.body;
+
+  if (!userId || !resourceId || !message) {
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  try {
+    const userIdInt = parseInt(userId, 10);
+    const resourceIdInt = parseInt(resourceId, 10);
+
+    const user = await validateUser(userIdInt);
+    if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Get or create chat
+    let chat;
+    if (chatId) {
+      chat = await prisma.chat.findUnique({ where: { id: parseInt(chatId, 10) } });
+    }
+    if (!chat) {
+      chat = await prisma.chat.create({
+        data: {
+          userId: userIdInt,
+          resourceId: resourceIdInt,
+          title: message.substring(0, 80),
+        },
+      });
+    }
+
+    // Save user message
+    await prisma.message.create({
+      data: {
+        chatId: chat.id,
+        userId: userIdInt,
+        role: 'user',
+        content: message,
+      },
+    });
+
+    // Gather context: highlights + document text
+    const highlights = await prisma.highlight.findMany({
+      where: { userId: userIdInt, resourceId: resourceIdInt },
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+    });
+
+    const { resource, text: documentText } = await getResourceTextContent(resourceIdInt);
+
+    const highlightsContext = highlights.length > 0
+      ? highlights.map((h, i) => `[Highlight ${i + 1}, Page ${h.pageIndex + 1}, ${h.color}]: "${h.text}"`).join('\n')
+      : 'No highlights saved yet.';
+
+    const docContext = documentText
+      ? `\n\nDocument excerpt (first ~10 pages):\n${documentText.substring(0, 12000)}`
+      : '';
+
+    // Build conversation history
+    const previousMessages = await prisma.message.findMany({
+      where: { chatId: chat.id },
+      orderBy: { createdAt: 'asc' },
+      take: 40,
+    });
+
+    const conversationHistory = previousMessages.map(m => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    const systemPrompt = `You are PaperAI, an advanced AI study assistant embedded inside a PDF viewer. Your role is to help students deeply understand their study materials.
+
+You have access to the following context:
+
+**Document**: "${resource?.title || 'Unknown'}"
+**Subject**: ${resource?.subject || 'General'}
+
+**Student's Saved Highlights**:
+${highlightsContext}
+${docContext}
+
+**Guidelines**:
+- Be concise, accurate, and educational.
+- Reference specific highlights when relevant by quoting them.
+- Use LaTeX notation (e.g., \\(E = mc^2\\)) for mathematical expressions.
+- If you don't have enough context, say so honestly.
+- Format responses with markdown: use **bold**, *italic*, bullet points, and numbered lists.`;
+
+    // Check if API key exists
+    if (!process.env.DEEPSEEK_API_KEY) {
+      // Fallback: echo back a helpful message without AI
+      const fallbackReply = `I'm PaperAI! 🤖 I see you asked: "${message}"
+
+I currently don't have an API key configured, so I can't generate AI responses yet. To enable me:
+
+1. Get a DeepSeek API key from [platform.deepseek.com](https://platform.deepseek.com)
+2. Add it to your \`.env\` file as \`DEEPSEEK_API_KEY=your_key_here\`
+3. Restart the server
+
+**Your highlights are still being tracked!** You have ${highlights.length} highlight(s) saved for this document.`;
+
+      const aiMessage = await prisma.message.create({
+        data: {
+          chatId: chat.id,
+          userId: userIdInt,
+          role: 'assistant',
+          content: fallbackReply,
+        },
+      });
+
+      return res.json({
+        success: true,
+        chatId: chat.id,
+        message: aiMessage,
+      });
+    }
+
+    // Call DeepSeek API
+    const completion = await deepseek.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [
+        { role: 'system', content: systemPrompt },
+        ...conversationHistory,
+      ],
+      max_tokens: 2048,
+      temperature: 0.7,
+    });
+
+    const aiContent = completion.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+
+    // Save AI response
+    const aiMessage = await prisma.message.create({
+      data: {
+        chatId: chat.id,
+        userId: userIdInt,
+        role: 'assistant',
+        content: aiContent,
+      },
+    });
+
+    res.json({
+      success: true,
+      chatId: chat.id,
+      message: aiMessage,
+    });
+  } catch (error) {
+    console.error('PaperAI chat error:', error);
+    res.status(500).json({ success: false, message: 'AI service error: ' + error.message });
+  }
+});
+
+// GET /api/chats/:userId/:resourceId — Get all chats for a user+resource
+app.get('/api/chats/:userId/:resourceId', async (req, res) => {
+  const userId = parseInt(req.params.userId, 10);
+  const resourceId = parseInt(req.params.resourceId, 10);
+
+  try {
+    const chats = await prisma.chat.findMany({
+      where: { userId, resourceId },
+      include: {
+        _count: { select: { messages: true } },
+      },
+      orderBy: { updatedAt: 'desc' },
+    });
+    res.json({ success: true, chats });
+  } catch (error) {
+    console.error('Error fetching chats:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// GET /api/chats/:chatId/messages — Get messages for a chat
+app.get('/api/chats/:chatId/messages', async (req, res) => {
+  const chatId = parseInt(req.params.chatId, 10);
+
+  try {
+    const messages = await prisma.message.findMany({
+      where: { chatId },
+      orderBy: { createdAt: 'asc' },
+    });
+    res.json({ success: true, messages });
+  } catch (error) {
+    console.error('Error fetching messages:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// DELETE /api/chats/:chatId — Delete a chat and all its messages
+app.delete('/api/chats/:chatId', async (req, res) => {
+  const chatId = parseInt(req.params.chatId, 10);
+  const { userId } = req.body;
+
+  try {
+    const chat = await prisma.chat.findUnique({ where: { id: chatId } });
+    if (!chat) return res.status(404).json({ success: false, message: 'Chat not found' });
+    if (chat.userId !== parseInt(userId, 10)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized' });
+    }
+
+    await prisma.chat.delete({ where: { id: chatId } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting chat:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

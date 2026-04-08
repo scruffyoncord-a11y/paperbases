@@ -65,7 +65,10 @@ import {
   Image as ImageIcon,
   ZoomIn,
   ZoomOut,
-  ChevronLeft
+  ChevronLeft,
+  Send,
+  Bot,
+  RotateCcw
 } from 'lucide-react';
 import { GlobalWorkerOptions } from "pdfjs-dist";
 
@@ -449,6 +452,21 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
   const hasLiked = resource.likes?.some(l => l.userId === user?.id);
   const likeCount = resource._count?.likes || 0;
 
+  // PaperAI Chat State
+  const [sidebarTab, setSidebarTab] = React.useState('chat'); // 'chat' | 'highlights'
+  const [chatMessages, setChatMessages] = React.useState([]);
+  const [chatInput, setChatInput] = React.useState('');
+  const [isChatLoading, setIsChatLoading] = React.useState(false);
+  const [activeChatId, setActiveChatId] = React.useState(null);
+  const [contextNotification, setContextNotification] = React.useState(null);
+  const chatEndRef = React.useRef(null);
+  const chatInputRef = React.useRef(null);
+
+  // Auto-scroll chat to bottom
+  React.useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [chatMessages, isChatLoading]);
+
   // Performance: Lazy-load full resource data only when opened
   React.useEffect(() => {
     if (!resource.fileUrl && resource.id) {
@@ -477,6 +495,27 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
     }
   }, [resource.id, user?.id]);
 
+  // Load existing chat on mount
+  React.useEffect(() => {
+    if (resource.id && user?.id) {
+      fetch(`/api/chats/${user.id}/${resource.id}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.success && data.chats.length > 0) {
+            const latestChat = data.chats[0];
+            setActiveChatId(latestChat.id);
+            // Load messages
+            fetch(`/api/chats/${latestChat.id}/messages`)
+              .then(r => r.json())
+              .then(msgData => {
+                if (msgData.success) setChatMessages(msgData.messages);
+              });
+          }
+        })
+        .catch(console.error);
+    }
+  }, [resource.id, user?.id]);
+
   const handleHighlight = async (content, position, color = 'yellow') => {
     try {
         const textToSave = content.text || 'Area selection (Image/Diagram)';
@@ -499,6 +538,9 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
         if (data.success) {
             setHighlights([data.highlight, ...highlights]);
             setPendingSelection(null);
+            // Show context notification in chat tab
+            setContextNotification(`New highlight added: "${textToSave.substring(0, 60)}${textToSave.length > 60 ? '...' : ''}"`);
+            setTimeout(() => setContextNotification(null), 5000);
         }
     } catch(err) {
         console.error(err);
@@ -518,6 +560,57 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
     } catch(err) {
         console.error(err);
     }
+  };
+
+  // PaperAI: Send message
+  const sendChatMessage = async () => {
+    const msg = chatInput.trim();
+    if (!msg || isChatLoading) return;
+
+    // Optimistic UI: add user message immediately
+    const tempUserMsg = { id: 'temp-' + Date.now(), role: 'user', content: msg, createdAt: new Date().toISOString() };
+    setChatMessages(prev => [...prev, tempUserMsg]);
+    setChatInput('');
+    setIsChatLoading(true);
+
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          resourceId: resource.id,
+          message: msg,
+          chatId: activeChatId,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setActiveChatId(data.chatId);
+        // Replace temp message with real ones from DB & add AI response
+        setChatMessages(prev => {
+          const withoutTemp = prev.filter(m => m.id !== tempUserMsg.id);
+          return [...withoutTemp, { ...tempUserMsg, id: 'user-' + Date.now() }, data.message];
+        });
+      } else {
+        // Show error as AI message
+        setChatMessages(prev => [...prev, { id: 'err-' + Date.now(), role: 'assistant', content: `⚠️ ${data.message || 'Something went wrong.'}`, createdAt: new Date().toISOString() }]);
+      }
+    } catch (err) {
+      console.error(err);
+      setChatMessages(prev => [...prev, { id: 'err-' + Date.now(), role: 'assistant', content: '⚠️ Network error. Please try again.', createdAt: new Date().toISOString() }]);
+    } finally {
+      setIsChatLoading(false);
+      chatInputRef.current?.focus();
+    }
+  };
+
+  // Start new chat
+  const startNewChat = () => {
+    setActiveChatId(null);
+    setChatMessages([]);
+    setChatInput('');
+    chatInputRef.current?.focus();
   };
 
   const COLORS = [
@@ -566,83 +659,257 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
             )}
         </div>
 
-        {/* Highlights Sidebar (Permanent) */}
-        <div className="w-96 bg-white dark:bg-[#161923] border-l border-slate-200 dark:border-white/10 flex flex-col shrink-0 overflow-hidden">
-            <div className="p-5 border-b border-slate-100 dark:border-white/5 bg-slate-50/50 dark:bg-white/5">
-                <h3 className="font-black text-xs text-slate-900 dark:text-white uppercase tracking-[0.2em]">Study Dashboard</h3>
+        {/* ===== PaperAI Sidebar ===== */}
+        <div className="w-[420px] bg-white dark:bg-[#161923] border-l border-slate-200 dark:border-white/10 flex flex-col shrink-0 overflow-hidden">
+            {/* Sidebar Tab Switcher */}
+            <div className="flex border-b border-slate-100 dark:border-white/5 shrink-0">
+              <button
+                onClick={() => setSidebarTab('chat')}
+                className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-[11px] font-black uppercase tracking-[0.15em] transition-all relative ${
+                  sidebarTab === 'chat'
+                    ? 'text-violet-600 dark:text-violet-400 bg-violet-500/5'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                }`}
+              >
+                <Bot size={15} />
+                PaperAI
+                {sidebarTab === 'chat' && <div className="absolute bottom-0 inset-x-4 h-[2px] bg-violet-500 rounded-full" />}
+              </button>
+              <button
+                onClick={() => setSidebarTab('highlights')}
+                className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-[11px] font-black uppercase tracking-[0.15em] transition-all relative ${
+                  sidebarTab === 'highlights'
+                    ? 'text-amber-600 dark:text-amber-400 bg-amber-500/5'
+                    : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
+                }`}
+              >
+                <Highlighter size={15} />
+                Highlights
+                {highlights.length > 0 && <span className="text-[9px] font-bold bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded-full ml-1">{highlights.length}</span>}
+                {sidebarTab === 'highlights' && <div className="absolute bottom-0 inset-x-4 h-[2px] bg-amber-500 rounded-full" />}
+              </button>
             </div>
 
-            {/* Selection Context & Color Picker (Conditional) */}
-            {pendingSelection && (
-                <div className="p-5 border-b border-slate-100 dark:border-white/10 bg-blue-500/5 animate-in slide-in-from-top duration-300">
-                    <div className="flex justify-between items-center mb-3">
-                        <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-500/10 px-2 py-1 rounded-md">New Selection</span>
-                        <button onClick={() => setPendingSelection(null)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"><X size={16} /></button>
+            {/* ===== Chat Tab ===== */}
+            {sidebarTab === 'chat' && (
+              <>
+                {/* Context Notification Banner */}
+                {contextNotification && (
+                  <div className="px-4 py-3 bg-gradient-to-r from-violet-500/10 to-blue-500/10 border-b border-violet-500/10 flex items-center gap-2.5 animate-in slide-in-from-top duration-300">
+                    <div className="w-6 h-6 rounded-full bg-violet-500/20 flex items-center justify-center shrink-0">
+                      <Sparkles size={12} className="text-violet-500" />
                     </div>
-                    <div className="bg-white dark:bg-[#0B0E14] p-3 rounded-xl border border-blue-500/20 mb-4 max-h-32 overflow-y-auto no-scrollbar">
-                        <p className="text-xs italic text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
-                            <Latex>{pendingSelection.content.text || "Area selection"}</Latex>
-                        </p>
+                    <p className="text-[10px] text-violet-600 dark:text-violet-400 font-bold leading-tight flex-1">PaperAI context updated! {contextNotification}</p>
+                    <button onClick={() => setContextNotification(null)} className="text-violet-400 hover:text-violet-600 transition-colors"><X size={14} /></button>
+                  </div>
+                )}
+
+                {/* Chat Header */}
+                <div className="px-4 py-3 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-white/[0.02]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
+                      <Bot size={14} className="text-white" />
                     </div>
-                    <div className="flex items-center justify-between gap-2">
-                        <span className="text-[10px] font-bold text-slate-400 uppercase">Apply Color:</span>
-                        <div className="flex gap-2">
-                            {COLORS.map((color) => (
-                                <button
-                                    key={color.id}
-                                    onClick={() => handleHighlight(pendingSelection.content, pendingSelection.position, color.id)}
-                                    className={`w-8 h-8 rounded-xl ${color.bg} ${color.glow} hover:scale-110 active:scale-90 transition-all flex items-center justify-center text-slate-900`}
-                                >
-                                    <Highlighter size={14} />
-                                </button>
-                            ))}
-                        </div>
+                    <div>
+                      <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-wider leading-none">PaperAI</h4>
+                      <p className="text-[9px] text-slate-400 mt-0.5">{highlights.length} highlight{highlights.length !== 1 ? 's' : ''} in context</p>
                     </div>
+                  </div>
+                  <button
+                    onClick={startNewChat}
+                    title="New conversation"
+                    className="w-7 h-7 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-400 hover:text-violet-500 hover:border-violet-500/30 transition-all"
+                  >
+                    <RotateCcw size={13} />
+                  </button>
                 </div>
+
+                {/* Messages Area */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
+                  {chatMessages.length === 0 && !isChatLoading && (
+                    <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
+                      <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-500/10 to-blue-500/10 border border-violet-500/10 flex items-center justify-center mb-5">
+                        <Bot size={36} className="text-violet-500/60" />
+                      </div>
+                      <h4 className="text-sm font-black text-slate-900 dark:text-white mb-2">Hey! I'm PaperAI 🧠</h4>
+                      <p className="text-xs text-slate-500 leading-relaxed mb-6 max-w-[260px]">
+                        I can help you understand this document. Ask me anything about the content, your highlights, or the subject.
+                      </p>
+                      <div className="space-y-2 w-full">
+                        {[
+                          'Summarize this document',
+                          'Explain my highlighted sections',
+                          'What are the key concepts?',
+                        ].map(suggestion => (
+                          <button
+                            key={suggestion}
+                            onClick={() => { setChatInput(suggestion); chatInputRef.current?.focus(); }}
+                            className="w-full text-left px-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:border-violet-500/30 hover:text-violet-600 dark:hover:text-violet-400 transition-all group"
+                          >
+                            <span className="text-violet-500 mr-2 opacity-50 group-hover:opacity-100">→</span>
+                            {suggestion}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {chatMessages.map((msg, idx) => (
+                    <div
+                      key={msg.id || idx}
+                      className={`flex gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300 ${
+                        msg.role === 'user' ? 'justify-end' : 'justify-start'
+                      }`}
+                      style={{ animationDelay: `${idx * 30}ms` }}
+                    >
+                      {msg.role === 'assistant' && (
+                        <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-violet-500/20">
+                          <Bot size={14} className="text-white" />
+                        </div>
+                      )}
+                      <div
+                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed ${
+                          msg.role === 'user'
+                            ? 'bg-gradient-to-br from-violet-600 to-blue-600 text-white rounded-br-md shadow-lg shadow-violet-500/10'
+                            : 'bg-slate-100 dark:bg-white/[0.06] text-slate-800 dark:text-slate-200 rounded-bl-md border border-slate-200 dark:border-white/5'
+                        }`}
+                      >
+                        {msg.role === 'assistant' ? (
+                          <div className="prose-sm prose-slate dark:prose-invert max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:mb-1 [&_code]:bg-slate-200 [&_code]:dark:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[11px] [&_strong]:text-slate-900 [&_strong]:dark:text-white whitespace-pre-wrap">
+                            {msg.content}
+                          </div>
+                        ) : (
+                          <span className="font-medium">{msg.content}</span>
+                        )}
+                      </div>
+                      {msg.role === 'user' && (
+                        <div className="w-7 h-7 rounded-xl bg-slate-200 dark:bg-white/10 flex items-center justify-center shrink-0 mt-1">
+                          <User size={14} className="text-slate-500" />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+
+                  {/* Typing Indicator */}
+                  {isChatLoading && (
+                    <div className="flex gap-2.5 items-start animate-in fade-in duration-300">
+                      <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shrink-0 shadow-lg shadow-violet-500/20">
+                        <Bot size={14} className="text-white" />
+                      </div>
+                      <div className="bg-slate-100 dark:bg-white/[0.06] rounded-2xl rounded-bl-md px-5 py-4 border border-slate-200 dark:border-white/5">
+                        <div className="flex gap-1.5">
+                          <div className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '0ms' }} />
+                          <div className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '150ms' }} />
+                          <div className="w-2 h-2 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: '300ms' }} />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={chatEndRef} />
+                </div>
+
+                {/* Chat Input */}
+                <div className="p-3 bg-white dark:bg-black/20 border-t border-slate-100 dark:border-white/5">
+                  <div className="flex items-end gap-2 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-slate-200 dark:border-white/10 p-1.5 focus-within:border-violet-500/40 transition-colors">
+                    <textarea
+                      ref={chatInputRef}
+                      value={chatInput}
+                      onChange={e => setChatInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } }}
+                      placeholder="Ask PaperAI anything..."
+                      rows={1}
+                      className="flex-1 bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 outline-none resize-none px-3 py-2 max-h-24"
+                    />
+                    <button
+                      onClick={sendChatMessage}
+                      disabled={!chatInput.trim() || isChatLoading}
+                      className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-blue-600 text-white flex items-center justify-center hover:shadow-lg hover:shadow-violet-500/25 active:scale-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:shadow-none shrink-0"
+                    >
+                      <Send size={16} />
+                    </button>
+                  </div>
+                  <p className="text-[9px] text-slate-400 text-center mt-2 font-medium">PaperAI uses your highlights & document as context</p>
+                </div>
+              </>
             )}
 
-            <div className="p-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
-                <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest">Saved Highlights</h4>
-                <span className="text-[10px] font-bold text-blue-500 bg-blue-500/10 px-2.5 py-0.5 rounded-full">{highlights.length}</span>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar bg-slate-50/30 dark:bg-transparent">
-                {highlights.length === 0 && !pendingSelection && (
-                    <div className="text-center py-16 px-6">
-                        <div className="w-16 h-16 bg-slate-100 dark:bg-white/5 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-slate-200 dark:border-white/5">
-                            <Highlighter size={28} className="text-slate-300 dark:text-slate-600" />
+            {/* ===== Highlights Tab ===== */}
+            {sidebarTab === 'highlights' && (
+              <>
+                {/* Selection Context & Color Picker (Conditional) */}
+                {pendingSelection && (
+                    <div className="p-5 border-b border-slate-100 dark:border-white/10 bg-blue-500/5 animate-in slide-in-from-top duration-300">
+                        <div className="flex justify-between items-center mb-3">
+                            <span className="text-[10px] font-black text-blue-500 uppercase tracking-widest bg-blue-500/10 px-2 py-1 rounded-md">New Selection</span>
+                            <button onClick={() => setPendingSelection(null)} className="text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors"><X size={16} /></button>
                         </div>
-                        <p className="text-xs text-slate-500 font-bold mb-1 uppercase tracking-tighter">No annotations found</p>
-                        <p className="text-[10px] text-slate-400 leading-relaxed">Select text in the PDF to start your active study session.</p>
+                        <div className="bg-white dark:bg-[#0B0E14] p-3 rounded-xl border border-blue-500/20 mb-4 max-h-32 overflow-y-auto no-scrollbar">
+                            <p className="text-xs italic text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
+                                <Latex>{pendingSelection.content.text || "Area selection"}</Latex>
+                            </p>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-bold text-slate-400 uppercase">Apply Color:</span>
+                            <div className="flex gap-2">
+                                {COLORS.map((color) => (
+                                    <button
+                                        key={color.id}
+                                        onClick={() => handleHighlight(pendingSelection.content, pendingSelection.position, color.id)}
+                                        className={`w-8 h-8 rounded-xl ${color.bg} ${color.glow} hover:scale-110 active:scale-90 transition-all flex items-center justify-center text-slate-900`}
+                                    >
+                                        <Highlighter size={14} />
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
                 )}
-                {highlights.map(h => (
-                    <div key={h.id} className="bg-white dark:bg-[#0B0E14] p-4 rounded-2xl border border-slate-200 dark:border-white/5 group shadow-sm hover:shadow-md transition-all active:scale-[0.98]">
-                        <div className="flex justify-between items-center mb-3">
-                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
-                                h.color === 'green' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' :
-                                h.color === 'blue' ? 'text-sky-600 dark:text-sky-400 bg-sky-500/10' :
-                                h.color === 'pink' ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10' :
-                                'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10'
-                            }`}>Page {h.pageIndex + 1}</span>
-                            <button onClick={() => deleteHighlight(h.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12} /></button>
+
+                <div className="p-4 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
+                    <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest">Saved Highlights</h4>
+                    <span className="text-[10px] font-bold text-amber-500 bg-amber-500/10 px-2.5 py-0.5 rounded-full">{highlights.length}</span>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar bg-slate-50/30 dark:bg-transparent">
+                    {highlights.length === 0 && !pendingSelection && (
+                        <div className="text-center py-16 px-6">
+                            <div className="w-16 h-16 bg-slate-100 dark:bg-white/5 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-slate-200 dark:border-white/5">
+                                <Highlighter size={28} className="text-slate-300 dark:text-slate-600" />
+                            </div>
+                            <p className="text-xs text-slate-500 font-bold mb-1 uppercase tracking-tighter">No annotations found</p>
+                            <p className="text-[10px] text-slate-400 leading-relaxed">Select text in the PDF to start your active study session.</p>
                         </div>
-                        <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-relaxed">
-                            <Latex>{h.text}</Latex>
-                        </p>
-                    </div>
-                ))}
-            </div>
-            
-            <div className="p-5 bg-white dark:bg-black/20 border-t border-slate-100 dark:border-white/5">
-                <div className="flex items-start gap-3 bg-blue-500/10 p-3 rounded-xl border border-blue-500/10">
-                    <Sparkles size={16} className="text-blue-500 shrink-0 mt-0.5" />
-                    <div>
-                        <p className="text-[10px] text-blue-600 dark:text-blue-400 font-bold leading-normal uppercase tracking-wider mb-1">Study Vault Active</p>
-                        <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">Snippets are synced with your global dashboard for review.</p>
+                    )}
+                    {highlights.map(h => (
+                        <div key={h.id} className="bg-white dark:bg-[#0B0E14] p-4 rounded-2xl border border-slate-200 dark:border-white/5 group shadow-sm hover:shadow-md transition-all active:scale-[0.98]">
+                            <div className="flex justify-between items-center mb-3">
+                                <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${
+                                    h.color === 'green' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10' :
+                                    h.color === 'blue' ? 'text-sky-600 dark:text-sky-400 bg-sky-500/10' :
+                                    h.color === 'pink' ? 'text-rose-600 dark:text-rose-400 bg-rose-500/10' :
+                                    'text-yellow-600 dark:text-yellow-400 bg-yellow-500/10'
+                                }`}>Page {h.pageIndex + 1}</span>
+                                <button onClick={() => deleteHighlight(h.id)} className="text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-all"><Trash2 size={12} /></button>
+                            </div>
+                            <p className="text-xs font-semibold text-slate-700 dark:text-slate-300 leading-relaxed">
+                                <Latex>{h.text}</Latex>
+                            </p>
+                        </div>
+                    ))}
+                </div>
+                
+                <div className="p-5 bg-white dark:bg-black/20 border-t border-slate-100 dark:border-white/5">
+                    <div className="flex items-start gap-3 bg-violet-500/10 p-3 rounded-xl border border-violet-500/10">
+                        <Bot size={16} className="text-violet-500 shrink-0 mt-0.5" />
+                        <div>
+                            <p className="text-[10px] text-violet-600 dark:text-violet-400 font-bold leading-normal uppercase tracking-wider mb-1">PaperAI Enabled</p>
+                            <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">Your highlights are automatically used as context for AI conversations.</p>
+                        </div>
                     </div>
                 </div>
-            </div>
+              </>
+            )}
         </div>
       </div>
     </div>

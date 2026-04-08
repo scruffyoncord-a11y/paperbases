@@ -26,6 +26,8 @@ model User {
   tasks       Task[]
   schedules   ScheduleSlot[]
   highlights  Highlight[]
+  chats       Chat[]
+  messages    Message[]
 }
 
 model Resource {
@@ -36,10 +38,12 @@ model Resource {
   tag         String?  // e.g. "PYQ", "Formula Sheet"
   fileUrl     String
   fileType    String   // e.g. "pdf", "image"
+  textContent String?  @db.Text // Cached extracted PDF text for PaperAI
   userId      Int
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   likes       ResourceLike[]
   highlights  Highlight[]
+  chats       Chat[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -142,4 +146,31 @@ model Highlight {
 
   @@index([userId])
   @@index([resourceId])
+}
+
+model Chat {
+  id         Int       @id @default(autoincrement())
+  userId     Int
+  resourceId Int
+  title      String?   // Auto-generated from first message
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  resource   Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  messages   Message[]
+
+  @@index([userId, resourceId])
+}
+
+model Message {
+  id        Int      @id @default(autoincrement())
+  chatId    Int
+  userId    Int
+  role      String   // "user" or "assistant"
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  chat      Chat     @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([chatId])
 }
