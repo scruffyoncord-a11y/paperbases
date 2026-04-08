@@ -663,8 +663,25 @@ app.get('/api/timetable/:userId', async (req, res) => {
     const user = await validateUser(userId);
     if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-    const tasks = await prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
+    let tasks = await prisma.task.findMany({ where: { userId }, orderBy: { createdAt: 'desc' } });
     const schedules = await prisma.scheduleSlot.findMany({ where: { userId }, orderBy: { time: 'asc' } });
+    
+    // Daily Reset Logic: If a task was marked done on a previous day, reset it to undone
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const tasksToReset = tasks.filter(t => t.done && new Date(t.updatedAt) < today);
+    if (tasksToReset.length > 0) {
+      await prisma.task.updateMany({
+        where: { 
+          id: { in: tasksToReset.map(t => t.id) },
+          userId: userId
+        },
+        data: { done: false }
+      });
+      // Update the local tasks list to reflect the reset without an extra query
+      tasks = tasks.map(t => (t.done && new Date(t.updatedAt) < today) ? { ...t, done: false } : t);
+    }
     
     res.json({ 
       success: true, 

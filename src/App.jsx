@@ -774,7 +774,7 @@ function UploadResourceModal({ onClose, onUpload, syllabusMode, modeSubjects }) 
 export default function App() {
   const [user, setUser] = useState(() => {
     try {
-      const savedUser = localStorage.getItem('peakprep_user');
+      const savedUser = localStorage.getItem('paperbase_user');
       return savedUser ? JSON.parse(savedUser) : null;
     } catch {
       return null;
@@ -782,7 +782,7 @@ export default function App() {
   });
   const [isAuthenticated, setIsAuthenticated] = useState(() => {
     try {
-      return !!localStorage.getItem('peakprep_user');
+      return !!localStorage.getItem('paperbase_user');
     } catch {
       return false;
     }
@@ -805,7 +805,7 @@ export default function App() {
   const [syllabusData, setSyllabusData] = useState(null); // From DB
   const [syllabusProgress, setSyllabusProgress] = useState(() => {
     try {
-      const savedProgress = localStorage.getItem('peakprep_progress');
+      const savedProgress = localStorage.getItem('paperbase_progress');
       return savedProgress ? JSON.parse(savedProgress) : {};
     } catch {
       return {};
@@ -813,7 +813,7 @@ export default function App() {
   }); 
 
   useEffect(() => {
-    localStorage.setItem('peakprep_progress', JSON.stringify(syllabusProgress));
+    localStorage.setItem('paperbase_progress', JSON.stringify(syllabusProgress));
   }, [syllabusProgress]);
 
   // Resource Sharing State
@@ -875,9 +875,9 @@ export default function App() {
 
   useEffect(() => {
     if (user) {
-      localStorage.setItem('peakprep_user', JSON.stringify(user));
+      localStorage.setItem('paperbase_user', JSON.stringify(user));
     } else {
-      localStorage.removeItem('peakprep_user');
+      localStorage.removeItem('paperbase_user');
     }
   }, [user]);
 
@@ -900,8 +900,8 @@ export default function App() {
           } else {
             // User doesn't exist in DB anymore — force re-login
             console.warn('Stale session detected, user not found in DB. Logging out.');
-            localStorage.removeItem('peakprep_user');
-            localStorage.removeItem('peakprep_progress');
+            localStorage.removeItem('paperbase_user');
+            localStorage.removeItem('paperbase_progress');
             setUser(null);
             setIsAuthenticated(false);
             setAuthPage('login');
@@ -1978,7 +1978,7 @@ export default function App() {
 
         <aside className="w-64 border-r border-slate-200 dark:border-white/5 flex flex-col fixed h-full bg-white/90 dark:bg-[#0B0E14]/80 backdrop-blur-2xl z-50 transition-colors duration-300">
           <div className="p-6 flex items-center mb-4">
-            <img src="/logo.png" alt="PeakPrep Logo" className="h-10 w-auto object-contain transition-all" onError={(e) => { e.target.src = 'https://via.placeholder.com/150x40?text=PEAKPREP'; }} />
+            <img src="/logo.png" alt="PaperBase Logo" className="h-10 w-auto object-contain transition-all" onError={(e) => { e.target.src = 'https://via.placeholder.com/150x40?text=PAPERBASE'; }} />
           </div>
           <nav className="flex-1 px-4 space-y-2">
             <SidebarItem icon={<Home size={20} />} label="Home" active={activeTab === 'Home' || activeTab === 'ChapterPYQs'} onClick={() => setActiveTab('Home')} />
@@ -1996,7 +1996,7 @@ export default function App() {
               {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
               <span className="font-bold">{isDarkMode ? 'Light Mode' : 'Dark Mode'}</span>
             </div>
-            <a href="https://peakprep.github.io/peakprep/" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-white/10 no-underline">
+            <a href="https://github.com/scruffyoncord-a11y/paperbases" target="_blank" rel="noopener noreferrer" className="flex items-center gap-3 px-4 py-3 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-white/10 no-underline">
               <Chrome size={18} />
               <span className="font-bold">Our Extension</span>
             </a>
@@ -2599,7 +2599,7 @@ export default function App() {
                 <div className="p-6 space-y-6">
                   <div>
                     <h4 className="text-sm font-bold text-slate-900 dark:text-white mb-1">Theme Preferences</h4>
-                    <p className="text-[11px] text-slate-500 font-medium mb-3">Choose how PeakPrep looks to you.</p>
+                    <p className="text-[11px] text-slate-500 font-medium mb-3">Choose how PaperBase looks to you.</p>
                     <div className="flex bg-slate-100 dark:bg-[#0B0E14] p-1 rounded-xl border border-slate-200 dark:border-[#333942]">
                         <button onClick={() => !isDarkMode && setIsDarkMode(false)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${!isDarkMode ? 'bg-white shadow-sm text-slate-900' : 'text-slate-500 hover:text-slate-700'}`}>Light</button>
                         <button onClick={() => !isDarkMode && setIsDarkMode(true)} className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${isDarkMode ? 'bg-[#22262e] shadow-sm text-white border border-[#333942]' : 'text-slate-500 hover:text-slate-300'}`}>Dark</button>

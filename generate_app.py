@@ -1,4 +1,4 @@
-﻿import json
+import json
 
 content = ``import React, { useState, useMemo, useEffect } from 'react';
 import { 
@@ -136,7 +136,7 @@ export default function App() {
     <div className={isDarkMode ? 'dark' : ''}>
       <div className="flex min-h-screen bg-slate-50 dark:bg-[#0B0E14] text-slate-600 dark:text-slate-300 font-sans relative overflow-hidden transition-colors duration-300">
         <aside className="w-64 border-r border-slate-200 dark:border-white/5 flex flex-col fixed h-full bg-white/90 dark:bg-[#0B0E14]/80 backdrop-blur-2xl z-50">
-          <div className="p-6 flex items-center mb-4 text-xl font-bold">PEAKPREP</div>
+          <div className="p-6 flex items-center mb-4 text-xl font-bold">PAPERBASE</div>
           <nav className="flex-1 px-4 space-y-2">
             <SidebarItem icon={<Home size={20} />} label="Home" active={activeTab === 'Home'} onClick={() => setActiveTab('Home')} isDarkMode={isDarkMode} />
             <SidebarItem icon={<Target size={20} />} label="Goals" active={activeTab === 'Goals'} onClick={() => setActiveTab('Goals')} isDarkMode={isDarkMode} />
