@@ -2112,7 +2112,7 @@ export default function App() {
 
               <section className="mb-10">
                 <div className="flex justify-between items-center mb-2">
-                  <h2 className="font-black text-xl text-slate-900 dark:text-white flex items-center gap-3"><Zap size={24} className="text-amber-500 dark:text-amber-400" /> Recommended Modules</h2>
+                  <h2 className="font-black text-xl text-slate-900 dark:text-white flex items-center gap-3"><img src="/logo.png" className="w-8 h-8 object-contain" alt="" /> Recommended Modules</h2>
                   <button className="text-xs font-bold text-blue-600 dark:text-blue-500 uppercase tracking-widest hover:text-blue-500 dark:hover:text-blue-400 transition">All Tests</button>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mb-6">Handpicked practice modules based on your performance trends.</p>
@@ -2274,7 +2274,7 @@ export default function App() {
                       rel="noopener noreferrer"
                       className="group/btn relative inline-flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 rounded-2xl font-black text-lg shadow-[0_10px_30px_rgba(37,99,235,0.3)] hover:shadow-[0_15px_40px_rgba(37,99,235,0.5)] transition-all duration-300 hover:-translate-y-1"
                     >
-                      <Zap size={20} className="fill-current" />
+                      <img src="/logo.png" className="w-6 h-6 object-contain" alt="" />
                       Launch Exam Portal
                       <ChevronRight size={20} className="group-hover/btn:translate-x-1 transition-transform" />
                     </a>
