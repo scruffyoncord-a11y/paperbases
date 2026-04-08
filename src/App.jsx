@@ -402,12 +402,23 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
                                              highlight.comment?.color === 'blue' ? 'hl-blue' :
                                              highlight.comment?.color === 'pink' ? 'hl-pink' : 'hl-yellow';
 
+                          // Numbering logic: find the index in original highlights to match sidebar
+                          const highlightId = formattedHighlights.findIndex(h => h.id === highlight.id) + 1;
+
+                          const commonBadge = (
+                             <div className="absolute -top-3 -left-1 z-10 w-5 h-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-md flex items-center justify-center text-[10px] font-black shadow-lg border border-white/20">
+                               #{highlightId}
+                             </div>
+                          );
+
                           const component = isTextHighlight ? (
-                              <div className={colorClass}>
+                              <div className={`${colorClass} relative`}>
+                                  {commonBadge}
                                   <Highlight isScrolledTo={isScrolledTo} position={highlight.position} comment={highlight.comment} />
                               </div>
                           ) : (
-                              <div className={colorClass}>
+                              <div className={`${colorClass} relative`}>
+                                  {commonBadge}
                                   <AreaHighlight isScrolledTo={isScrolledTo} highlight={highlight} onChange={() => {}} />
                               </div>
                           );
@@ -473,9 +484,9 @@ function renderMarkdown(text) {
     // Links
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" class="text-violet-500 hover:underline">$1</a>')
     // LaTeX display math \[...\]
-    .replace(/\\\[([\\s\\S]*?)\\\]/g, '<div class="latex-content my-2">\\[$1\\]</div>')
+    .replace(/\\\[([\s\S]*?)\\\]/g, '<div class="latex-content my-2">\\\\[$1\\\\]</div>')
     // LaTeX inline math \(...\)
-    .replace(/\\\((.+?)\\\)/g, '<span class="latex-content">\\($1\\)</span>')
+    .replace(/\\\((.+?)\\\)/g, '<span class="latex-content">\\\\($1\\\\)</span>')
     // Double newline -> paragraph break
     .replace(/\n\n/g, '</p><p class="mb-2">')
     // Single newline -> line break
@@ -485,6 +496,26 @@ function renderMarkdown(text) {
   html = html.replace(/<p class="mb-2"><\/p>/g, '');
   return html;
 }
+
+// Wrapper for AI messages to ensure MathJax runs
+const ChatMessageContent = ({ content }) => {
+  const nodeRef = React.useRef(null);
+  const mjReady = useMathJax();
+
+  React.useEffect(() => {
+    if (mjReady && nodeRef.current && window.MathJax?.typesetPromise) {
+      window.MathJax.typesetPromise([nodeRef.current]).catch(err => console.error("MathJax Chat Error:", err));
+    }
+  }, [content, mjReady]);
+
+  return (
+    <div 
+      ref={nodeRef}
+      className="prose-sm prose-slate dark:prose-invert max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:mb-1 [&_code]:bg-slate-200 [&_code]:dark:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[11px] [&_strong]:text-slate-900 [&_strong]:dark:text-white"
+      dangerouslySetInnerHTML={{ __html: renderMarkdown(content) }}
+    />
+  );
+};
 
 // ---- Isolated Resource Viewer Modal ----
 // Kept outside App so likes/state changes don't remount PdfViewer
@@ -819,10 +850,7 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                         }`}
                       >
                         {msg.role === 'assistant' ? (
-                          <div 
-                            className="prose-sm prose-slate dark:prose-invert max-w-none [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:pl-4 [&_ol]:pl-4 [&_li]:mb-1 [&_code]:bg-slate-200 [&_code]:dark:bg-white/10 [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-[11px] [&_strong]:text-slate-900 [&_strong]:dark:text-white"
-                            dangerouslySetInnerHTML={{ __html: renderMarkdown(msg.content) }}
-                          />
+                          <ChatMessageContent content={msg.content} />
                         ) : (
                           <span className="font-medium">{msg.content}</span>
                         )}
