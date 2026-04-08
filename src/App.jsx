@@ -799,7 +799,7 @@ export default function App() {
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedExamForPYQ, setSelectedExamForPYQ] = useState(null);
   const [pyqSubject, setPyqSubject] = useState('Physics');
-  const [selectedDay, setSelectedDay] = useState('Mon');
+  const [selectedDay, setSelectedDay] = useState(new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(new Date()));
   const [syllabusMode, setSyllabusMode] = useState('jee'); 
   const [activeSubject, setActiveSubject] = useState('Physics');
   const [syllabusData, setSyllabusData] = useState(null); // From DB
