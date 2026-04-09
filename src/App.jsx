@@ -2094,7 +2094,8 @@ export default function App() {
                      (r.tag && r.tag.toLowerCase().includes(searchQuery.toLowerCase())))
                 ).map((res) => (
                     <ResourceCard key={res.id} res={res} />
-                ))}
+                ))
+            )}
           </div>
         )}
 
