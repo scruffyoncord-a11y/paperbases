@@ -72,7 +72,7 @@ import {
 } from 'lucide-react';
 import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
 
-GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 import {
   PdfLoader,
@@ -367,9 +367,9 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
        {isLoading && <div className="absolute top-0 inset-x-0 h-1 bg-blue-600 animate-pulse z-50"></div>}
        <PdfLoader 
            url={url} 
-           beforeLoad={<div className="p-20 flex flex-col items-center justify-center text-slate-400 font-bold h-full"><div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mb-4"></div>Optimizing PDF...</div>}
-           workerSrc="/pdf.worker.min.js"
-           onError={(err) => { setIsLoading(false); console.error("PDF Loader Err:", err); }}
+           beforeLoad={<div className="p-20 flex flex-col items-center justify-center text-slate-400 font-bold h-full"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>Loading Document...</div>}
+           workerSrc="/pdf.worker.min.mjs"
+           onError={(err) => { setIsLoading(false); console.error(err); }}
        >
           {(pdfDocument) => {
               if (isLoading) setIsLoading(false);
@@ -1860,72 +1860,36 @@ export default function App() {
       
       const render = async () => {
         try {
-          let pdfData = fileUrl;
-          
-          if (typeof fileUrl === 'string' && fileUrl.includes('base64,')) {
-            try {
-              const base64 = fileUrl.split('base64,')[1];
-              // Decodes Base64 to binary string safely
-              const binaryStr = window.atob(base64);
-              const len = binaryStr.length;
-              const bytes = new Uint8Array(len);
-              for (let i = 0; i < len; i++) {
-                bytes[i] = binaryStr.charCodeAt(i);
-              }
-              pdfData = { data: bytes };
-            } catch (e) {
-              if (!cancelled) { setStatus('error'); setErrorMsg('DATA_FMT'); }
-              return;
-            }
-          }
-
           const loadingTask = pdfjsGetDocument({
-            ...(typeof pdfData === 'string' ? { url: pdfData } : pdfData),
+            url: fileUrl,
             cMapUrl: 'https://unpkg.com/pdfjs-dist@4.4.168/cmaps/',
             cMapPacked: true,
-            disableRange: true,
-            disableAutoFetch: true,
           });
           
-          loadingTask.onProgress = (p) => {
-             // Optional: Handle progress
-          };
-
           const pdf = await loadingTask.promise;
           if (cancelled) return;
           
           const page = await pdf.getPage(1);
           if (cancelled) return;
           
-          // Official technique: Upscale for quality, downscale via CSS
-          const upscaleFactor = 2;
-          const viewport = page.getViewport({ scale: upscaleFactor });
+          const scale = 0.8;
+          const viewport = page.getViewport({ scale });
           const canvas = canvasRef.current;
           if (!canvas || cancelled) return;
           
-          const ctx = canvas.getContext('2d', { alpha: false }); // Disable alpha for better perf & white bg fill
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           
-          // Fill white background (crucial for transparent PDFs)
-          ctx.fillStyle = "white";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-          
           await page.render({ 
-            canvasContext: ctx, 
+            canvasContext: canvas.getContext('2d'), 
             viewport 
           }).promise;
           
           if (!cancelled) setStatus('loaded');
           pdf.destroy();
         } catch (err) {
-          console.error("PDF Component Error:", err);
-          if (!cancelled) {
-            setStatus('error');
-            setErrorMsg(err.name === 'MissingPDFException' ? 'NOT_FOUND' : 'LOAD_ERR');
-            // If worker specifically failed
-            if (err.message?.includes('worker')) setErrorMsg('WORKER_ERR');
-          }
+          console.error("PDF Preview Error:", err);
+          if (!cancelled) setStatus('error');
         }
       };
       
@@ -1945,12 +1909,9 @@ export default function App() {
             {status === 'loading' ? (
               <div className="w-6 h-6 border-2 border-slate-200 dark:border-slate-800 border-t-blue-500 rounded-full animate-spin" />
             ) : (
-              <div className="flex flex-col items-center gap-2 opacity-30">
+              <div className="flex flex-col items-center gap-2 opacity-20">
                 <FileText size={40} className="text-slate-400" />
-                <div className="flex flex-col items-center">
-                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">No Preview</span>
-                   {errorMsg && <span className="text-[8px] font-bold text-rose-500 mt-1">{errorMsg}</span>}
-                </div>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">No Preview</span>
               </div>
             )}
           </div>
