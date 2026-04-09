@@ -72,7 +72,7 @@ import {
 } from 'lucide-react';
 import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
 
-GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.js";
+GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
 
 import {
   PdfLoader,
@@ -367,9 +367,9 @@ const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
        {isLoading && <div className="absolute top-0 inset-x-0 h-1 bg-blue-600 animate-pulse z-50"></div>}
        <PdfLoader 
            url={url} 
-           beforeLoad={<div className="p-20 flex flex-col items-center justify-center text-slate-400 font-bold h-full"><div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>Loading Document...</div>}
-           workerSrc="/pdf.worker.min.mjs"
-           onError={(err) => { setIsLoading(false); console.error(err); }}
+           beforeLoad={<div className="p-20 flex flex-col items-center justify-center text-slate-400 font-bold h-full"><div className="w-8 h-8 border-4 border-violet-500 border-t-transparent rounded-full animate-spin mb-4"></div>Optimizing PDF...</div>}
+           workerSrc="/pdf.worker.min.js"
+           onError={(err) => { setIsLoading(false); console.error("PDF Loader Err:", err); }}
        >
           {(pdfDocument) => {
               if (isLoading) setIsLoading(false);
@@ -1865,7 +1865,8 @@ export default function App() {
           if (typeof fileUrl === 'string' && fileUrl.includes('base64,')) {
             try {
               const base64 = fileUrl.split('base64,')[1];
-              const binaryStr = atob(base64);
+              // Decodes Base64 to binary string safely
+              const binaryStr = window.atob(base64);
               const len = binaryStr.length;
               const bytes = new Uint8Array(len);
               for (let i = 0; i < len; i++) {
@@ -1873,7 +1874,7 @@ export default function App() {
               }
               pdfData = { data: bytes };
             } catch (e) {
-              if (!cancelled) { setStatus('error'); setErrorMsg('BASE64_FAIL'); }
+              if (!cancelled) { setStatus('error'); setErrorMsg('DATA_FMT'); }
               return;
             }
           }
