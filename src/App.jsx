@@ -2010,6 +2010,7 @@ export default function App() {
           <button onClick={() => setResourceTab('Quick Access')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Quick Access' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Quick Access</button>
           <button onClick={() => setResourceTab('Trending')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Trending' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Trending</button>
           <button onClick={() => setResourceTab('Browse')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Browse' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Browse Resources</button>
+          <button onClick={() => setResourceTab('Upload')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Upload' ? 'border-b-2 border-violet-600 dark:border-violet-500 text-violet-600 dark:text-violet-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Upload</button>
         </div>
 
         {resourceTab === 'Quick Access' && (
@@ -2028,9 +2029,9 @@ export default function App() {
 
             {/* Static Content / Popular Links - Now Vertical! */}
             {[
-              { id: 'math-formulae', title: 'Math Formulae', desc: 'Combined sheets for JEE', type: 'pdf', subject: 'Maths', count: 42 },
-              { id: 'physics-notes', title: 'Physics Notes', desc: 'Optics & Modern Physics', type: 'pdf', subject: 'Physics', count: 18 },
-              { id: 'chemistry-pqr', title: 'Organic Reaction List', desc: 'All reagents & mechanisms', type: 'pdf', subject: 'Chemistry', count: 35 },
+              { id: 'dpp-paper', title: 'DPP / Paper', desc: 'Practice Questions', icon: <FileText size={80} />, color: 'text-emerald-500', bg: 'bg-emerald-50' },
+              { id: 'formula-sheet', title: 'Formula Sheet', desc: 'Quick Revision', icon: <ClipboardList size={80} />, color: 'text-violet-500', bg: 'bg-violet-50' },
+              { id: 'other-misc', title: 'Other', desc: 'Misc Documents', icon: <Layers size={80} />, color: 'text-slate-400', bg: 'bg-slate-50' },
             ].map((item) => (
               <div 
                 key={item.id}
@@ -2038,11 +2039,11 @@ export default function App() {
                 className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[2rem] shadow-sm hover:border-violet-500/40 transition-all group cursor-pointer overflow-hidden flex flex-col min-h-[280px]"
               >
                 <div className="aspect-[4/5] w-full bg-slate-50 dark:bg-[#0B0E14] relative overflow-hidden flex items-center justify-center border-b border-slate-100 dark:border-white/5">
-                   <div className="absolute inset-0 flex items-center justify-center opacity-10 group-hover:scale-110 transition-transform">
-                      {item.subject === 'Maths' ? <Calculator size={80} /> : item.subject === 'Physics' ? <Zap size={80} /> : <ClipboardList size={80} />}
+                   <div className={`absolute inset-0 flex items-center justify-center opacity-10 group-hover:scale-110 transition-transform ${item.color}`}>
+                      {item.icon}
                    </div>
                    <div className="z-10 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
-                      <span className="text-[10px] font-black uppercase text-white tracking-widest">{item.subject}</span>
+                      <span className={`text-[10px] font-black uppercase tracking-widest ${item.color}`}>{item.title.split(' ')[0]}</span>
                    </div>
                 </div>
                 <div className="p-6">
@@ -2091,10 +2092,60 @@ export default function App() {
                      r.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                      r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
                      (r.tag && r.tag.toLowerCase().includes(searchQuery.toLowerCase())))
-                ).map((res) => (
-                    <ResourceCard key={res.id} res={res} />
-                ))
             )}
+          </div>
+        )}
+
+        {resourceTab === 'Upload' && (
+          <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[3rem] p-10 animate-in slide-in-from-bottom-4 duration-500">
+             <div className="text-center mb-12">
+                <div className="w-16 h-16 bg-violet-500/10 rounded-3xl flex items-center justify-center text-violet-600 mx-auto mb-6 shadow-sm">
+                   <UploadCloud size={32} />
+                </div>
+                <h1 className="text-4xl font-black text-slate-900 dark:text-white mb-4 tracking-tight">Contribute Materials</h1>
+                <p className="text-slate-500 dark:text-slate-400 max-w-lg mx-auto leading-relaxed font-medium">
+                   Upload PDFs, Handwritten Notes, or OCR JSON files. Help the community and keep your materials organized in one place.
+                </p>
+             </div>
+
+             <div className="space-y-12">
+                <div>
+                   <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-[0.2em] mb-6 ml-1">What are you uploading?</h3>
+                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { id: 'Study Notes', title: 'Study Notes', sub: 'Handwritten/Typed', icon: <Book size={22} />, color: 'text-blue-500', bg: 'bg-blue-500/5', border: 'border-blue-500/20' },
+                        { id: 'DPP / Paper', title: 'DPP / Paper', sub: 'Practice Questions', icon: <FileText size={22} />, color: 'text-emerald-500', bg: 'bg-emerald-500/5', border: 'border-emerald-500/20' },
+                        { id: 'Formula Sheet', title: 'Formula Sheet', sub: 'Quick Revision', icon: <ClipboardList size={22} />, color: 'text-violet-500', bg: 'bg-violet-500/5', border: 'border-violet-500/20' },
+                        { id: 'Other', title: 'Other', sub: 'Misc Documents', icon: <Layers size={22} />, color: 'text-slate-400', bg: 'bg-slate-400/5', border: 'border-slate-400/20' },
+                      ].map((cat) => (
+                        <button
+                          key={cat.id}
+                          className="p-6 rounded-[2rem] border-2 bg-white dark:bg-white/5 border-slate-100 dark:border-white/5 hover:border-violet-500/30 text-left transition-all group"
+                          onClick={() => { setShowUploadModal(true); }}
+                        >
+                          <div className={`w-12 h-12 rounded-2xl ${cat.bg} ${cat.color} flex items-center justify-center mb-4 group-hover:scale-110 transition-transform`}>
+                            {cat.icon}
+                          </div>
+                          <h4 className="font-black text-slate-900 dark:text-white text-sm mb-1">{cat.title}</h4>
+                          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-tight">{cat.sub}</p>
+                        </button>
+                      ))}
+                   </div>
+                </div>
+
+                <div 
+                   onClick={() => setShowUploadModal(true)}
+                   className="relative rounded-[3rem] border-2 border-dashed border-slate-200 dark:border-white/10 hover:border-violet-500/40 bg-slate-50/50 dark:bg-white/[0.01] transition-all p-16 text-center group cursor-pointer"
+                >
+                   <div className="max-w-xs mx-auto flex flex-col items-center">
+                      <div className="w-20 h-20 rounded-full bg-white dark:bg-white/5 text-slate-300 group-hover:text-violet-500 flex items-center justify-center mb-6 transition-all shadow-sm">
+                         <UploadCloud size={32} />
+                      </div>
+                      <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 tracking-tight">Drop & drop files here</h3>
+                      <p className="text-sm text-slate-500 font-medium">Supports PDF, PNG, JPG, and Markdown</p>
+                   </div>
+                </div>
+             </div>
           </div>
         )}
       </section>
