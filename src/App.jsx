@@ -72,7 +72,7 @@ import {
 } from 'lucide-react';
 import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
 
-GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
+GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
 
 import {
   PdfLoader,
@@ -1862,7 +1862,7 @@ export default function App() {
         try {
           const loadingTask = pdfjsGetDocument({
             url: fileUrl,
-            cMapUrl: 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/cmaps/',
+            cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/',
             cMapPacked: true,
           });
           
@@ -1872,7 +1872,7 @@ export default function App() {
           const page = await pdf.getPage(1);
           if (cancelled) return;
           
-          const scale = 0.5;
+          const scale = 0.8; // Higher resolution for better clarity
           const viewport = page.getViewport({ scale });
           const canvas = canvasRef.current;
           if (!canvas || cancelled) return;
@@ -1888,7 +1888,7 @@ export default function App() {
           if (!cancelled) setStatus('loaded');
           pdf.destroy();
         } catch (err) {
-          console.error("PDF Preview Error:", err);
+          console.error("PDF Preview Error (v4):", err);
           if (!cancelled) setStatus('error');
         }
       };
@@ -2013,27 +2013,41 @@ export default function App() {
         </div>
 
         {resourceTab === 'Quick Access' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Upload Button Card */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 animate-in slide-in-from-bottom-4 duration-500">
+            {/* Redesigned Upload Button Card - Vertical to Match */}
             <div 
               onClick={() => setShowUploadModal(true)}
-              className="bg-blue-600/5 dark:bg-blue-600/10 border-2 border-dashed border-blue-400/50 dark:border-blue-500/30 p-4 rounded-xl shadow-sm hover:bg-blue-600/10 dark:hover:bg-blue-600/20 transition-all cursor-pointer flex items-center gap-4 group"
+              className="bg-violet-600/5 dark:bg-violet-600/10 border-2 border-dashed border-violet-500/30 rounded-[2rem] p-8 shadow-sm hover:bg-violet-600/10 transition-all cursor-pointer flex flex-col items-center justify-center text-center group min-h-[280px]"
             >
-              <div className="p-3 rounded-lg bg-blue-600 text-white shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform">
-                <Upload size={22} />
+              <div className="w-16 h-16 rounded-3xl bg-violet-600 text-white shadow-xl shadow-violet-600/20 group-hover:scale-110 transition-transform flex items-center justify-center mb-5">
+                <UploadCloud size={28} />
               </div>
-              <div>
-                <h4 className="font-bold text-blue-600 dark:text-blue-400 text-sm">Upload Resource</h4>
-                <p className="text-[10px] text-blue-500/80 font-medium">Share your notes with others</p>
-              </div>
+              <h4 className="font-black text-slate-900 dark:text-white text-lg mb-2">Upload Resource</h4>
+              <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[140px] leading-relaxed">Share your study materials with the community</p>
             </div>
 
-            {resources.map((res, i) => (
-              <div key={i} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-4 rounded-xl shadow-sm hover:border-blue-400 transition-all cursor-pointer flex items-center gap-4 group" onClick={() => { if(res.title === 'Physics Formulae') setSelectedResource(dbResources.find(dr => dr.subject === 'Physics' && dr.tag === 'Formula Sheet') || dbResources[0]); }}>
-                <div className={`p-3 rounded-lg ${res.bg} ${res.iconColor} group-hover:scale-110 transition-transform`}>{res.icon}</div>
-                <div>
-                  <h4 className="font-bold text-slate-900 dark:text-white text-sm">{res.title}</h4>
-                  <p className="text-xs text-slate-500 dark:text-slate-400">{res.desc}</p>
+            {/* Static Content / Popular Links - Now Vertical! */}
+            {[
+              { id: 'math-formulae', title: 'Math Formulae', desc: 'Combined sheets for JEE', type: 'pdf', subject: 'Maths', count: 42 },
+              { id: 'physics-notes', title: 'Physics Notes', desc: 'Optics & Modern Physics', type: 'pdf', subject: 'Physics', count: 18 },
+              { id: 'chemistry-pqr', title: 'Organic Reaction List', desc: 'All reagents & mechanisms', type: 'pdf', subject: 'Chemistry', count: 35 },
+            ].map((item) => (
+              <div 
+                key={item.id}
+                onClick={() => setSelectedResource(dbResources.find(r => r.title.includes(item.title)) || dbResources[0])}
+                className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[2rem] shadow-sm hover:border-violet-500/40 transition-all group cursor-pointer overflow-hidden flex flex-col min-h-[280px]"
+              >
+                <div className="aspect-[4/5] w-full bg-slate-50 dark:bg-[#0B0E14] relative overflow-hidden flex items-center justify-center border-b border-slate-100 dark:border-white/5">
+                   <div className="absolute inset-0 flex items-center justify-center opacity-10 group-hover:scale-110 transition-transform">
+                      {item.subject === 'Maths' ? <Calculator size={80} /> : item.subject === 'Physics' ? <Zap size={80} /> : <ClipboardList size={80} />}
+                   </div>
+                   <div className="z-10 bg-white/10 backdrop-blur-md px-4 py-2 rounded-full border border-white/20">
+                      <span className="text-[10px] font-black uppercase text-white tracking-widest">{item.subject}</span>
+                   </div>
+                </div>
+                <div className="p-6">
+                  <h4 className="font-black text-slate-900 dark:text-white text-sm mb-1 group-hover:text-violet-500 transition-colors">{item.title}</h4>
+                  <p className="text-[11px] text-slate-500/80 leading-relaxed line-clamp-2">{item.desc}</p>
                 </div>
               </div>
             ))}
