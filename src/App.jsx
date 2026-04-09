@@ -72,7 +72,7 @@ import {
 } from 'lucide-react';
 import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
 
-GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs";
+GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
 
 import {
   PdfLoader,
@@ -1827,10 +1827,11 @@ export default function App() {
     const containerRef = React.useRef(null);
     const [status, setStatus] = React.useState('idle');
 
+    const [errorMsg, setErrorMsg] = React.useState('');
+
     useEffect(() => {
       if (fileType !== 'pdf' || !fileUrl) return;
       
-      // Use IntersectionObserver but with a fallback
       const observer = new IntersectionObserver(
         ([entry]) => { 
           if (entry.isIntersecting) { 
@@ -1838,15 +1839,14 @@ export default function App() {
             observer.disconnect(); 
           } 
         },
-        { threshold: 0, rootMargin: '50px' }
+        { threshold: 0, rootMargin: '100px' }
       );
       
       if (containerRef.current) observer.observe(containerRef.current);
       
-      // Fallback: if not loaded after 2 seconds, try loading anyway
       const timer = setTimeout(() => {
         if (status === 'idle') setStatus('loading');
-      }, 2000);
+      }, 1000);
 
       return () => {
         observer.disconnect();
@@ -1860,10 +1860,32 @@ export default function App() {
       
       const render = async () => {
         try {
+          let pdfData = fileUrl;
+          
+          // Explicitly handle Base64 decoding for workers
+          if (typeof fileUrl === 'string' && fileUrl.includes('base64,')) {
+            try {
+              const base64 = fileUrl.split('base64,')[1];
+              const binaryStr = atob(base64);
+              const len = binaryStr.length;
+              const bytes = new Uint8Array(len);
+              for (let i = 0; i < len; i++) {
+                bytes[i] = binaryStr.charCodeAt(i);
+              }
+              pdfData = { data: bytes };
+            } catch (e) {
+              console.error("Base64 Decode Error:", e);
+              if (!cancelled) { setStatus('error'); setErrorMsg('DATA_FMT'); }
+              return;
+            }
+          }
+
           const loadingTask = pdfjsGetDocument({
-            url: fileUrl,
+            ...(typeof pdfData === 'string' ? { url: pdfData } : pdfData),
             cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/',
             cMapPacked: true,
+            disableRange: true, // Key for data/blob URLs
+            disableAutoFetch: true,
           });
           
           const pdf = await loadingTask.promise;
@@ -1872,11 +1894,11 @@ export default function App() {
           const page = await pdf.getPage(1);
           if (cancelled) return;
           
-          const scale = 0.8; // Higher resolution for better clarity
-          const viewport = page.getViewport({ scale });
+          const viewport = page.getViewport({ scale: 1.0 }); // Full scale first
           const canvas = canvasRef.current;
           if (!canvas || cancelled) return;
           
+          // Higher density canvas for quality
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           
@@ -1888,8 +1910,11 @@ export default function App() {
           if (!cancelled) setStatus('loaded');
           pdf.destroy();
         } catch (err) {
-          console.error("PDF Preview Error (v4):", err);
-          if (!cancelled) setStatus('error');
+          console.error("PDF Component Error:", err);
+          if (!cancelled) {
+            setStatus('error');
+            setErrorMsg(err.name === 'MissingPDFException' ? 'MISSING' : 'ENGINE_ERR');
+          }
         }
       };
       
@@ -1909,9 +1934,12 @@ export default function App() {
             {status === 'loading' ? (
               <div className="w-6 h-6 border-2 border-slate-200 dark:border-slate-800 border-t-blue-500 rounded-full animate-spin" />
             ) : (
-              <div className="flex flex-col items-center gap-2 opacity-20">
+              <div className="flex flex-col items-center gap-2 opacity-30">
                 <FileText size={40} className="text-slate-400" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">No Preview</span>
+                <div className="flex flex-col items-center">
+                   <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">No Preview</span>
+                   {errorMsg && <span className="text-[8px] font-bold text-rose-500 mt-1">{errorMsg}</span>}
+                </div>
               </div>
             )}
           </div>
