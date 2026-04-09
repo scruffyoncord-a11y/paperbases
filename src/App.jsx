@@ -1803,7 +1803,7 @@ export default function App() {
 
         <div className="flex gap-6 border-b border-slate-200 dark:border-white/10 mb-6">
           <button onClick={() => setResourceTab('Quick Access')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Quick Access' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Quick Access</button>
-          <button onClick={() => setResourceTab('Browse')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Browse' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Browse Community</button>
+          <button onClick={() => setResourceTab('Browse')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Browse' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Browse Resources</button>
         </div>
 
         {resourceTab === 'Quick Access' && (
@@ -1875,17 +1875,7 @@ export default function App() {
           </div>
         )}
 
-        {/* Upload CTA */}
-        <div className="bg-gradient-to-r from-blue-600/10 to-indigo-600/10 dark:from-blue-600/20 dark:to-indigo-600/20 rounded-[2rem] p-8 md:p-12 text-center mt-12 mb-4 border border-blue-200 dark:border-blue-500/20">
-          <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-3">Help your friends succeed!</h3>
-          <p className="text-slate-500 dark:text-slate-400 mb-8 max-w-lg mx-auto">Upload your revision notes, formula sheets, or hand-written solutions to help the community.</p>
-          <button 
-            onClick={() => setShowUploadModal(true)}
-            className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black shadow-xl shadow-blue-600/20 hover:scale-105 transition-all flex items-center gap-3 mx-auto"
-          >
-            <Upload size={20} /> UPLOAD RESOURCE
-          </button>
-        </div>
+
 
       </section>
     );
