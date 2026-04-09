@@ -72,7 +72,7 @@ import {
 } from 'lucide-react';
 import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
 
-GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
+GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@4.4.168/build/pdf.worker.min.js";
 
 import {
   PdfLoader,
@@ -1839,14 +1839,14 @@ export default function App() {
             observer.disconnect(); 
           } 
         },
-        { threshold: 0, rootMargin: '100px' }
+        { threshold: 0, rootMargin: '200px' }
       );
       
       if (containerRef.current) observer.observe(containerRef.current);
       
       const timer = setTimeout(() => {
         if (status === 'idle') setStatus('loading');
-      }, 1000);
+      }, 500); // Faster fallback
 
       return () => {
         observer.disconnect();
@@ -1862,7 +1862,6 @@ export default function App() {
         try {
           let pdfData = fileUrl;
           
-          // Explicitly handle Base64 decoding for workers
           if (typeof fileUrl === 'string' && fileUrl.includes('base64,')) {
             try {
               const base64 = fileUrl.split('base64,')[1];
@@ -1874,36 +1873,45 @@ export default function App() {
               }
               pdfData = { data: bytes };
             } catch (e) {
-              console.error("Base64 Decode Error:", e);
-              if (!cancelled) { setStatus('error'); setErrorMsg('DATA_FMT'); }
+              if (!cancelled) { setStatus('error'); setErrorMsg('BASE64_FAIL'); }
               return;
             }
           }
 
           const loadingTask = pdfjsGetDocument({
             ...(typeof pdfData === 'string' ? { url: pdfData } : pdfData),
-            cMapUrl: 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/cmaps/',
+            cMapUrl: 'https://unpkg.com/pdfjs-dist@4.4.168/cmaps/',
             cMapPacked: true,
-            disableRange: true, // Key for data/blob URLs
+            disableRange: true,
             disableAutoFetch: true,
           });
           
+          loadingTask.onProgress = (p) => {
+             // Optional: Handle progress
+          };
+
           const pdf = await loadingTask.promise;
           if (cancelled) return;
           
           const page = await pdf.getPage(1);
           if (cancelled) return;
           
-          const viewport = page.getViewport({ scale: 1.0 }); // Full scale first
+          // Official technique: Upscale for quality, downscale via CSS
+          const upscaleFactor = 2;
+          const viewport = page.getViewport({ scale: upscaleFactor });
           const canvas = canvasRef.current;
           if (!canvas || cancelled) return;
           
-          // Higher density canvas for quality
+          const ctx = canvas.getContext('2d', { alpha: false }); // Disable alpha for better perf & white bg fill
           canvas.width = viewport.width;
           canvas.height = viewport.height;
           
+          // Fill white background (crucial for transparent PDFs)
+          ctx.fillStyle = "white";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          
           await page.render({ 
-            canvasContext: canvas.getContext('2d'), 
+            canvasContext: ctx, 
             viewport 
           }).promise;
           
@@ -1913,7 +1921,9 @@ export default function App() {
           console.error("PDF Component Error:", err);
           if (!cancelled) {
             setStatus('error');
-            setErrorMsg(err.name === 'MissingPDFException' ? 'MISSING' : 'ENGINE_ERR');
+            setErrorMsg(err.name === 'MissingPDFException' ? 'NOT_FOUND' : 'LOAD_ERR');
+            // If worker specifically failed
+            if (err.message?.includes('worker')) setErrorMsg('WORKER_ERR');
           }
         }
       };
