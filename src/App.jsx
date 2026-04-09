@@ -70,7 +70,7 @@ import {
   Bot,
   RotateCcw
 } from 'lucide-react';
-import { GlobalWorkerOptions } from "pdfjs-dist";
+import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
 
 GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
@@ -1766,6 +1766,117 @@ export default function App() {
     );
   };
 
+  const PdfThumbnail = React.memo(({ fileUrl, fileType }) => {
+    const canvasRef = React.useRef(null);
+    const containerRef = React.useRef(null);
+    const [status, setStatus] = React.useState('idle');
+
+    useEffect(() => {
+      if (fileType !== 'pdf' || !fileUrl) return;
+      const observer = new IntersectionObserver(
+        ([entry]) => { if (entry.isIntersecting) { setStatus('loading'); observer.disconnect(); } },
+        { threshold: 0.1 }
+      );
+      if (containerRef.current) observer.observe(containerRef.current);
+      return () => observer.disconnect();
+    }, [fileUrl, fileType]);
+
+    useEffect(() => {
+      if (status !== 'loading' || fileType !== 'pdf') return;
+      let cancelled = false;
+      const render = async () => {
+        try {
+          const pdf = await pdfjsGetDocument(fileUrl).promise;
+          if (cancelled) return;
+          const page = await pdf.getPage(1);
+          if (cancelled) return;
+          const viewport = page.getViewport({ scale: 0.4 });
+          const canvas = canvasRef.current;
+          if (!canvas || cancelled) return;
+          canvas.width = viewport.width;
+          canvas.height = viewport.height;
+          await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+          if (!cancelled) setStatus('loaded');
+          pdf.destroy();
+        } catch (err) {
+          if (!cancelled) setStatus('error');
+        }
+      };
+      render();
+      return () => { cancelled = true; };
+    }, [status, fileUrl, fileType]);
+
+    if (fileType !== 'pdf') {
+      return <img src={fileUrl} alt="preview" className="w-full h-full object-cover" />;
+    }
+
+    return (
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center bg-white dark:bg-[#0f1117]">
+        <canvas ref={canvasRef} className={`max-w-full max-h-full object-contain ${status === 'loaded' ? '' : 'hidden'}`} />
+        {status !== 'loaded' && (
+          <div className="flex flex-col items-center gap-2">
+            {status === 'loading' ? (
+              <div className="w-5 h-5 border-2 border-slate-200 dark:border-slate-700 border-t-blue-500 rounded-full animate-spin" />
+            ) : (
+              <FileText size={36} className="text-slate-200 dark:text-slate-700" />
+            )}
+          </div>
+        )}
+      </div>
+    );
+  });
+
+  const ResourceCard = ({ res }) => {
+    const hasLiked = res.likes?.some(l => l.userId === user?.id);
+    return (
+      <div 
+        onClick={(e) => { if(e.target.closest('button') || e.target.closest('a')) return; setSelectedResource(res); }} 
+        className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm hover:border-blue-500 transition-all group cursor-pointer overflow-hidden flex flex-col"
+      >
+        <div className="aspect-[4/3] w-full bg-slate-100 dark:bg-[#0B0E14] relative overflow-hidden flex items-center justify-center border-b border-slate-100 dark:border-white/5">
+          <PdfThumbnail fileUrl={res.fileUrl} fileType={res.fileType} />
+          <div className="absolute top-3 left-3 flex items-center gap-2">
+            <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-white shadow-lg ${res.fileType === 'pdf' ? 'bg-rose-500' : 'bg-blue-500'}`}>
+              {res.fileType === 'pdf' ? 'PDF' : 'IMG'}
+            </span>
+          </div>
+          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+            <div className={`p-2 rounded-xl backdrop-blur-md bg-white/10 border border-white/20 text-white`}>
+              <ZoomIn size={16} />
+            </div>
+          </div>
+        </div>
+        <div className="p-5 flex-1 flex flex-col">
+          <div className="flex justify-between items-start mb-3">
+            <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${getSubjectColor(res.subject)}`}>
+              {res.subject}
+            </span>
+            <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{timeAgo(res.createdAt)}</span>
+          </div>
+          <h4 className="font-bold text-slate-900 dark:text-white mb-2 group-hover:text-blue-500 transition-colors line-clamp-1">{res.title}</h4>
+          <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 flex-1">{res.description}</p>
+          
+          <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold border border-white/20">
+                {res.user.picture ? <img src={res.user.picture} className="w-full h-full rounded-full" /> : res.user.name[0]}
+              </div>
+              <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{res.user.name}</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={() => handleLikeResource(res.id)} className={`flex items-center gap-1 text-[11px] font-black transition-colors ${hasLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
+                <ThumbsUp size={14} className={hasLiked ? 'fill-rose-500' : ''} /> {res._count?.likes || 0}
+              </button>
+              <a href={res.fileUrl} download={res.title} className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">
+                <UploadCloud size={16} />
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const ResourcesView = () => {
     const availableSubjects = ['All', ...modeSubjects[syllabusMode]];
 
@@ -1803,13 +1914,28 @@ export default function App() {
 
         <div className="flex gap-6 border-b border-slate-200 dark:border-white/10 mb-6">
           <button onClick={() => setResourceTab('Quick Access')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Quick Access' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Quick Access</button>
+          <button onClick={() => setResourceTab('Trending')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Trending' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Trending</button>
           <button onClick={() => setResourceTab('Browse')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Browse' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Browse Resources</button>
         </div>
 
         {resourceTab === 'Quick Access' && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Upload Button Card */}
+            <div 
+              onClick={() => setShowUploadModal(true)}
+              className="bg-blue-600/5 dark:bg-blue-600/10 border-2 border-dashed border-blue-400/50 dark:border-blue-500/30 p-4 rounded-xl shadow-sm hover:bg-blue-600/10 dark:hover:bg-blue-600/20 transition-all cursor-pointer flex items-center gap-4 group"
+            >
+              <div className="p-3 rounded-lg bg-blue-600 text-white shadow-lg shadow-blue-600/20 group-hover:scale-110 transition-transform">
+                <Upload size={22} />
+              </div>
+              <div>
+                <h4 className="font-bold text-blue-600 dark:text-blue-400 text-sm">Upload Resource</h4>
+                <p className="text-[10px] text-blue-500/80 font-medium">Share your notes with others</p>
+              </div>
+            </div>
+
             {resources.map((res, i) => (
-              <div key={i} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-4 rounded-xl shadow-sm hover:border-blue-400 transition-all cursor-pointer flex items-center gap-4 group">
+              <div key={i} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-4 rounded-xl shadow-sm hover:border-blue-400 transition-all cursor-pointer flex items-center gap-4 group" onClick={() => { if(res.title === 'Physics Formulae') setSelectedResource(dbResources.find(dr => dr.subject === 'Physics' && dr.tag === 'Formula Sheet') || dbResources[0]); }}>
                 <div className={`p-3 rounded-lg ${res.bg} ${res.iconColor} group-hover:scale-110 transition-transform`}>{res.icon}</div>
                 <div>
                   <h4 className="font-bold text-slate-900 dark:text-white text-sm">{res.title}</h4>
@@ -1820,13 +1946,31 @@ export default function App() {
           </div>
         )}
 
+        {resourceTab === 'Trending' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
+            {dbResources
+              .slice()
+              .sort((a, b) => (b._count?.likes || 0) - (a._count?.likes || 0))
+              .filter(r => 
+                (resourceFilter === 'All' || r.subject === resourceFilter) &&
+                (r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                 r.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                 r.subject.toLowerCase().includes(searchQuery.toLowerCase()))
+              ).slice(0, 6).map((res) => (
+                <ResourceCard key={res.id} res={res} />
+              ))
+            }
+          </div>
+        )}
+
         {resourceTab === 'Browse' && (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in slide-in-from-bottom-4 duration-500">
             {dbResources.filter(r => 
-                r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                r.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                (r.tag && r.tag.toLowerCase().includes(searchQuery.toLowerCase()))
+                (resourceFilter === 'All' || r.subject === resourceFilter) &&
+                (r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                 r.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                 r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                 (r.tag && r.tag.toLowerCase().includes(searchQuery.toLowerCase())))
             ).length === 0 ? (
                 <div className="col-span-full py-20 text-center text-slate-500">
                     <FolderSearch size={48} className="mx-auto mb-4 opacity-20" />
@@ -1834,52 +1978,21 @@ export default function App() {
                 </div>
             ) : (
                 dbResources.filter(r => 
-                    r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                    r.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                    (r.tag && r.tag.toLowerCase().includes(searchQuery.toLowerCase()))
-                ).map((res) => {
-                    const hasLiked = res.likes?.some(l => l.userId === user?.id);
-                    return (
-                    <div key={res.id} onClick={(e) => { if(e.target.closest('button') || e.target.closest('a')) return; setSelectedResource(res); }} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-5 rounded-2xl shadow-sm hover:border-blue-500 transition-all group cursor-pointer relative overflow-hidden">
-                        <div className="flex items-start justify-between mb-4">
-                            <div className={`p-3 rounded-xl ${getSubjectColor(res.subject)}`}>
-                                {res.fileType === 'pdf' ? <FileText size={20} /> : <ImageIcon size={20} />}
-                            </div>
-                            <div className="flex flex-col items-end gap-1">
-                                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{timeAgo(res.createdAt)}</span>
-                                {res.tag && <span className="text-[9px] px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/10 font-bold uppercase text-slate-600 dark:text-slate-300">{res.tag}</span>}
-                            </div>
-                        </div>
-                        <h4 className="font-bold text-slate-900 dark:text-white mb-1 group-hover:text-blue-500 transition-colors">{res.title}</h4>
-                        <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 h-8">{res.description}</p>
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-white/5">
-                            <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center text-[10px] text-white font-bold">
-                                    {res.user.picture ? <img src={res.user.picture} className="w-full h-full rounded-full" /> : res.user.name[0]}
-                                </div>
-                                <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{res.user.name}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                                <button onClick={() => handleLikeResource(res.id)} className={`flex items-center gap-1 text-[11px] font-black transition-colors ${hasLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
-                                    <ThumbsUp size={14} className={hasLiked ? 'fill-rose-500' : ''} /> {res._count?.likes || 0}
-                                </button>
-                                <a href={res.fileUrl} download={res.title} className="text-blue-600 dark:text-blue-400 hover:text-blue-700 font-bold text-[10px] flex items-center gap-1">
-                                    <UploadCloud size={14} /> SAVE
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                )})
+                    (resourceFilter === 'All' || r.subject === resourceFilter) &&
+                    (r.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                     r.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                     r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                     (r.tag && r.tag.toLowerCase().includes(searchQuery.toLowerCase())))
+                ).map((res) => (
+                    <ResourceCard key={res.id} res={res} />
+                ))
             )}
           </div>
         )}
-
-
-
       </section>
     );
   };
+
 
 
 
