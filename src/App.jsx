@@ -2092,7 +2092,9 @@ export default function App() {
                      r.description?.toLowerCase().includes(searchQuery.toLowerCase()) ||
                      r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
                      (r.tag && r.tag.toLowerCase().includes(searchQuery.toLowerCase())))
-            )}
+                ).map((res) => (
+                    <ResourceCard key={res.id} res={res} />
+                ))}
           </div>
         )}
 
