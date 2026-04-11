@@ -71,6 +71,8 @@ import {
   RotateCcw
 } from 'lucide-react';
 import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
+import { PolicyAcceptanceModal } from './Policies';
+
 
 GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
@@ -1195,6 +1197,12 @@ export default function App() {
     }
   });
   const [authPage, setAuthPage] = useState('login');
+  const [isExamActive, setIsExamActive] = useState(false);
+  const [hasAcceptedTerms, setHasAcceptedTerms] = useState(() => {
+    return localStorage.getItem('paperbase_policies_accepted') === 'true';
+  });
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [pendingResource, setPendingResource] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(true);
   const [activeTab, setActiveTab] = useState('Home');
   const [homeTab, setHomeTab] = useState('All');
@@ -1279,6 +1287,32 @@ export default function App() {
       }
     }
   }, [syllabusMode, activeSubject, modeSubjects]);
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('user');
+    localStorage.removeItem('paperbase_policies_accepted'); // Optional: reset on logout
+    setHasAcceptedTerms(false);
+  };
+
+  const handleAcceptPolicies = () => {
+    localStorage.setItem('paperbase_policies_accepted', 'true');
+    setHasAcceptedTerms(true);
+    setShowPolicyModal(false);
+    if (pendingResource) {
+      setSelectedResource(pendingResource);
+      setPendingResource(null);
+    }
+  };
+
+  const openResource = (res) => {
+    if (!hasAcceptedTerms) {
+      setPendingResource(res);
+      setShowPolicyModal(true);
+    } else {
+      setSelectedResource(res);
+    }
+  };
 
   useEffect(() => {
     if (user) {
@@ -1948,7 +1982,7 @@ export default function App() {
     const hasLiked = res.likes?.some(l => l.userId === user?.id);
     return (
       <div 
-        onClick={(e) => { if(e.target.closest('button') || e.target.closest('a')) return; setSelectedResource(res); }} 
+        onClick={(e) => { if(e.target.closest('button') || e.target.closest('a')) return; openResource(res); }} 
         className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm hover:border-blue-500 transition-all group cursor-pointer overflow-hidden flex flex-col"
       >
         <div className="aspect-[3/1] w-full bg-slate-100 dark:bg-[#0B0E14] relative overflow-hidden flex items-center justify-center border-b border-slate-100 dark:border-white/5">
@@ -2059,7 +2093,7 @@ export default function App() {
             ].map((item) => (
               <div 
                 key={item.id}
-                onClick={() => setSelectedResource(dbResources.find(r => r.title.includes(item.title)) || dbResources[0])}
+                onClick={() => openResource(dbResources.find(r => r.title.includes(item.title)) || dbResources[0])}
                 className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[2rem] shadow-sm hover:border-violet-500/40 transition-all group cursor-pointer overflow-hidden flex flex-col min-h-[280px]"
               >
                 <div className="aspect-[4/5] w-full bg-slate-50 dark:bg-[#0B0E14] relative overflow-hidden flex items-center justify-center border-b border-slate-100 dark:border-white/5">
@@ -2640,6 +2674,15 @@ export default function App() {
               <Chrome size={18} />
               <span className="font-bold">Our Extension</span>
             </a>
+            <div onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 text-sm text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 rounded-xl cursor-pointer transition-all border border-transparent hover:border-rose-200 dark:hover:border-rose-500/20 select-none">
+              <LogOut size={18} />
+              <span className="font-bold">Sign Out</span>
+            </div>
+          </div>
+          <div className="mt-auto p-6 border-t border-slate-200 dark:border-white/5 space-y-2.5 opacity-60 hover:opacity-100 transition-opacity">
+             <button onClick={() => setShowPolicyModal(true)} className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-500 block transition-colors">Terms & Conditions</button>
+             <button onClick={() => setShowPolicyModal(true)} className="text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-blue-500 block transition-colors">Privacy Policy</button>
+             <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter mt-4">© 2026 PaperBase.in</p>
           </div>
         </aside>
 
@@ -3365,6 +3408,13 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* Policy Acceptance Modal */}
+      <PolicyAcceptanceModal 
+        isOpen={showPolicyModal} 
+        onAccept={handleAcceptPolicies} 
+        onCancel={() => { setShowPolicyModal(false); setPendingResource(null); }} 
+      />
     </div>
   );
 }
