@@ -26,6 +26,43 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Initialize DeepSeek Client
+const deepseek = new OpenAI({
+  apiKey: process.env.DEEPSEEK_API_KEY || 'sk-empty',
+  baseURL: 'https://api.deepseek.com'
+});
+
+// AI Content Moderation Helper
+async function moderateContent(text) {
+  if (!text || text.length < 10) return { safe: true };
+  if (!process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY === 'sk-empty') {
+    console.warn("DEEPSEEK_API_KEY not found. Skipping AI moderation.");
+    return { safe: true };
+  }
+
+  try {
+    const response = await deepseek.chat.completions.create({
+      model: "deepseek-chat",
+      messages: [
+        { 
+          role: "system", 
+          content: "You are a content moderator for an educational platform called PaperBase. Check the following text for explicit content, hate speech, severe harassment, or illegal material. Respond with exactly 'SAFE' if the content is educational and appropriate, or 'UNSAFE' followed by a brief reason if it contains inappropriate material."
+        },
+        { role: "user", content: text.substring(0, 8000) }
+      ],
+      temperature: 0,
+    });
+
+    const result = response.choices[0].message.content.trim();
+    // Safety check: if result says UNSAFE anywhere, we flag it.
+    const isUnsafe = result.toUpperCase().includes('UNSAFE');
+    return { safe: !isUnsafe, reason: result };
+  } catch (error) {
+    console.error("AI Moderation error:", error);
+    return { safe: true }; // Fail open for reliability, or change to fail closed for strictness
+  }
+}
+
 // Unified Syllabus Dataset
 const UNIFIED_SYLLABUS = {
   "Maths": [
@@ -492,6 +529,25 @@ app.post('/api/resources', async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });
     }
+    
+    let textContent = null;
+    if (fileType === 'pdf') {
+       try {
+          textContent = await extractTextFromPdf(fileUrl, { maxPages: 20 });
+          // AI Verification Step
+          const moderation = await moderateContent(textContent);
+          if (!moderation.safe) {
+             console.warn(`Blocked potentially unsafe resource: ${title}. Reason: ${moderation.reason}`);
+             return res.status(400).json({ 
+                success: false, 
+                message: 'Your document was flagged by our security filters.', 
+                reason: moderation.reason 
+             });
+          }
+       } catch (err) {
+          console.error("PDF text extraction failed during moderation:", err);
+       }
+    }
 
     const resource = await prisma.resource.create({
       data: {
@@ -501,7 +557,8 @@ app.post('/api/resources', async (req, res) => {
         subject,
         tag,
         fileUrl,
-        fileType: fileType || 'pdf'
+        fileType: fileType || 'pdf',
+        textContent: textContent // Save text for PaperAI too
       },
       include: {
         user: { select: { id: true, name: true, picture: true } },

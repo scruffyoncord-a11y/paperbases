@@ -1841,7 +1841,10 @@ export default function App() {
             alert('Resource published successfully!');
             resolve();
           } else {
-            alert('Upload failed: ' + (data.message || 'Unknown error'));
+            const errorMsg = data.reason 
+              ? `${data.message}\n\nAI Scan Result: ${data.reason}`
+              : (data.message || 'Unknown error');
+            alert('Upload failed: ' + errorMsg);
             reject();
           }
         } catch (err) {
