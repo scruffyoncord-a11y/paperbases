@@ -68,7 +68,9 @@ import {
   ChevronLeft,
   Send,
   Bot,
-  RotateCcw
+  RotateCcw,
+  ThumbsDown,
+  AlertTriangle
 } from 'lucide-react';
 import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
 import { PolicyAcceptanceModal } from './Policies';
