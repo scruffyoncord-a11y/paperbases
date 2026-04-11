@@ -1374,7 +1374,6 @@ export default function App() {
   const [resourceFile, setResourceFile] = useState(null);
   const [reportingResource, setReportingResource] = useState(null);
   const [editingResource, setEditingResource] = useState(null);
-  const [editingResource, setEditingResource] = useState(null);
   const [isUpdatingResource, setIsUpdatingResource] = useState(false);
 
   // Compute current syllabus (DB version or default)
@@ -1469,22 +1468,7 @@ export default function App() {
     }
   };
 
-  const handleLikeResource = async (resourceId) => {
-    if (!user?.id) return;
-    try {
-      const res = await fetch(`/api/resources/${resourceId}/like`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setDbResources(prev => prev.map(r => r.id === resourceId ? data.resource : r));
-      }
-    } catch (error) {
-       console.error("Like error:", error);
-    }
-  };
+
 
   const handleDislikeResource = async (resourceId) => {
     if (!user?.id) return;
