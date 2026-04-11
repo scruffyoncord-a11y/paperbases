@@ -965,12 +965,6 @@ app.post('/api/schedule', async (req, res) => {
 
 // --- PaperAI Chat API ---
 
-// DeepSeek client (OpenAI-compatible)
-const deepseek = new OpenAI({
-  baseURL: 'https://api.deepseek.com',
-  apiKey: process.env.DEEPSEEK_API_KEY || '',
-});
-
 // Helper: get or extract text content for a resource
 async function getResourceTextContent(resourceId) {
   const resource = await prisma.resource.findUnique({ where: { id: resourceId } });
