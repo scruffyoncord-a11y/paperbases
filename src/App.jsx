@@ -1166,9 +1166,12 @@ function UploadResourceModal({ onClose, onUpload, user }) {
               >
                 <div className="relative z-10 flex items-center gap-3">
                   {isUploading ? (
-                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <div className="flex flex-col items-center">
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin mb-1" />
+                      <span className="text-[9px] font-black opacity-60 tracking-tighter">AI SCANNING...</span>
+                    </div>
                   ) : <Zap size={20} className="text-violet-500" />}
-                  {isUploading ? 'PUBLISHING...' : 'CONFIRM UPLOAD'}
+                  {isUploading ? '' : 'CONFIRM UPLOAD'}
                 </div>
                 <div className="absolute inset-0 bg-gradient-to-r from-violet-600 to-blue-600 opacity-0 group-hover:opacity-100 transition-opacity" />
               </button>
