@@ -1180,6 +1180,68 @@ function UploadResourceModal({ onClose, onUpload, user }) {
   );
 }
 
+// ---- Edit Resource Modal Component ----
+function EditResourceModal({ resource, onClose, onUpdate, isUpdating }) {
+  const [title, setTitle] = React.useState(resource?.title || '');
+  const [description, setDescription] = React.useState(resource?.description || '');
+  const [subject, setSubject] = React.useState(resource?.subject || 'Physics');
+  const [tag, setTag] = React.useState(resource?.tag || 'Study Notes');
+
+  const subjects = ['Maths', 'Physics', 'Chemistry', 'Biology'];
+  const categories = ['Study Notes', 'DPP / Paper', 'Formula Sheet', 'Other'];
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    onUpdate(resource.id, { title, description, subject, tag });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xl animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-[#0f1219] w-full max-w-lg rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/5 overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+        <div className="p-8 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-slate-50 dark:bg-white/5">
+           <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20"><Settings size={18} /></div>
+              <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Edit Resource</h2>
+           </div>
+           <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"><X size={20} className="text-slate-400" /></button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+           <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Document Title</label>
+              <input type="text" value={title} onChange={e => setTitle(e.target.value)} required className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3.5 outline-none focus:border-emerald-500 transition-all font-bold text-slate-900 dark:text-white" />
+           </div>
+           <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Description</label>
+              <textarea value={description} onChange={e => setDescription(e.target.value)} rows="3" className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3.5 outline-none focus:border-emerald-500 transition-all font-bold text-slate-900 dark:text-white resize-none" />
+           </div>
+           <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Subject</label>
+                 <select value={subject} onChange={e => setSubject(e.target.value)} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3.5 outline-none focus:border-emerald-500 transition-all font-bold text-slate-900 dark:text-white">
+                    {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+                 </select>
+              </div>
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Category</label>
+                 <select value={tag} onChange={e => setTag(e.target.value)} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3.5 outline-none focus:border-emerald-500 transition-all font-bold text-slate-900 dark:text-white">
+                    {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                 </select>
+              </div>
+           </div>
+           
+           <div className="pt-4">
+              <button disabled={isUpdating} type="submit" className="w-full py-4 rounded-2xl bg-slate-900 dark:bg-white text-white dark:text-slate-900 font-black text-sm shadow-xl hover:scale-[1.02] active:scale-95 transition-all flex items-center justify-center gap-2">
+                 {isUpdating ? <div className="w-4 h-4 border-2 border-slate-400 border-t-slate-900 rounded-full animate-spin" /> : <Save size={18} />}
+                 {isUpdating ? 'SAVING CHANGES...' : 'SAVE CHANGES'}
+              </button>
+           </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(() => {
     try {
@@ -1246,6 +1308,8 @@ export default function App() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [resourceFile, setResourceFile] = useState(null);
+  const [editingResource, setEditingResource] = useState(null);
+  const [isUpdatingResource, setIsUpdatingResource] = useState(false);
 
   // Compute current syllabus (DB version or default)
   // Simplified Syllabus
@@ -1336,6 +1400,45 @@ export default function App() {
     if (pendingResource) {
       setSelectedResource(pendingResource);
       setPendingResource(null);
+    }
+  };
+
+  const handleUpdateResource = async (resourceId, formData) => {
+    if (!user?.id) return;
+    setIsUpdatingResource(true);
+    try {
+      const res = await fetch(`/api/resources/${resourceId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, userId: user.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDbResources(prev => prev.map(r => r.id === resourceId ? data.resource : r));
+        setEditingResource(null);
+      }
+    } catch (error) {
+      console.error("Update error:", error);
+    } finally {
+      setIsUpdatingResource(false);
+    }
+  };
+
+  const handleDeleteResource = async (resourceId) => {
+    if (!user?.id || !window.confirm("Are you sure you want to delete this resource? This cannot be undone.")) return;
+    
+    try {
+      const res = await fetch(`/api/resources/${resourceId}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDbResources(prev => prev.filter(r => r.id !== resourceId));
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
     }
   };
 
@@ -2108,6 +2211,7 @@ export default function App() {
           <button onClick={() => setResourceTab('Quick Access')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Quick Access' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Quick Access</button>
           <button onClick={() => setResourceTab('Trending')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Trending' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Trending</button>
           <button onClick={() => setResourceTab('Browse')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Browse' ? 'border-b-2 border-blue-600 dark:border-blue-500 text-blue-600 dark:text-blue-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Browse Resources</button>
+          <button onClick={() => setResourceTab('My Uploads')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'My Uploads' ? 'border-b-2 border-emerald-600 dark:border-emerald-500 text-emerald-600 dark:text-emerald-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>My Uploads</button>
           <button onClick={() => setResourceTab('Upload')} className={`pb-2 text-sm font-bold transition-all ${resourceTab === 'Upload' ? 'border-b-2 border-violet-600 dark:border-violet-500 text-violet-600 dark:text-violet-500' : 'border-b-2 border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white'}`}>Upload</button>
         </div>
 
@@ -2151,6 +2255,37 @@ export default function App() {
               </div>
             ))}
           </div>
+        )}
+
+        {resourceTab === 'My Uploads' && (
+           <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+             <div className="flex items-center gap-3 mb-8 bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-2xl w-fit">
+                <div className="w-10 h-10 rounded-xl bg-emerald-500 text-white flex items-center justify-center shadow-lg shadow-emerald-500/20"><Layers size={20} /></div>
+                <div>
+                  <h3 className="font-black text-slate-900 dark:text-white text-sm">Managing Your Contributions</h3>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Only you can see and edit these documents</p>
+                </div>
+             </div>
+             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+               {dbResources.filter(r => r.userId === user?.id).length === 0 ? (
+                  <div className="col-span-full flex flex-col items-center justify-center py-20 border-2 border-dashed border-slate-200 dark:border-white/5 rounded-[3rem]">
+                     <div className="w-16 h-16 rounded-3xl bg-slate-100 dark:bg-white/5 text-slate-400 flex items-center justify-center mb-4"><UploadCloud size={32} /></div>
+                     <p className="font-bold text-slate-500 dark:text-slate-400">You haven't uploaded anything yet.</p>
+                     <button onClick={() => setResourceTab('Upload')} className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 transition">Start Sharing</button>
+                  </div>
+               ) : (
+                  dbResources.filter(r => r.userId === user?.id).map(res => (
+                    <div key={res.id} className="relative group">
+                       <ResourceCard res={res} />
+                       <div className="absolute top-3 left-3 flex gap-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button onClick={(e) => { e.stopPropagation(); setEditingResource(res); }} className="w-8 h-8 rounded-lg bg-emerald-500 text-white shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all"><Settings size={14} /></button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDeleteResource(res.id); }} className="w-8 h-8 rounded-lg bg-rose-500 text-white shadow-xl flex items-center justify-center hover:scale-110 active:scale-95 transition-all"><Trash2 size={14} /></button>
+                       </div>
+                    </div>
+                  ))
+               )}
+             </div>
+           </div>
         )}
 
         {resourceTab === 'Trending' && (
@@ -3367,6 +3502,15 @@ export default function App() {
           onClose={() => setSelectedResource(null)}
           onLike={handleLikeResource}
         />
+      )}
+
+      {editingResource && (
+         <EditResourceModal 
+            resource={editingResource} 
+            onClose={() => setEditingResource(null)} 
+            onUpdate={handleUpdateResource}
+            isUpdating={isUpdatingResource}
+         />
       )}
 
       {selectedDoubt && (

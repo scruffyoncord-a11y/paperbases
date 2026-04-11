@@ -568,6 +568,62 @@ app.post('/api/resources/:id/like', async (req, res) => {
   }
 });
 
+// Update a resource
+app.put('/api/resources/:id', async (req, res) => {
+  const resourceId = parseInt(req.params.id, 10);
+  const { userId, title, description, subject, tag } = req.body;
+  if (!userId) return res.status(400).json({ success: false, message: 'Missing userId' });
+
+  try {
+    const existing = await prisma.resource.findUnique({ where: { id: resourceId } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Resource not found' });
+    if (existing.userId !== parseInt(userId, 10)) {
+      return res.status(403).json({ success: false, message: 'Unauthorized update' });
+    }
+
+    const resource = await prisma.resource.update({
+      where: { id: resourceId },
+      data: { 
+        title: title || existing.title,
+        description: description || existing.description,
+        subject: subject || existing.subject,
+        tag: tag || existing.tag
+      },
+      include: {
+        user: { select: { id: true, name: true, picture: true } },
+        _count: { select: { likes: true } },
+        likes: { select: { userId: true } }
+      }
+    });
+
+    res.json({ success: true, resource });
+  } catch (error) {
+    console.error('Error updating resource:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Delete a resource
+app.delete('/api/resources/:id', async (req, res) => {
+  const resourceId = parseInt(req.params.id, 10);
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ success: false, message: 'Missing userId' });
+
+  try {
+    const existing = await prisma.resource.findUnique({ where: { id: resourceId } });
+    if (!existing) return res.status(404).json({ success: false, message: 'Resource not found' });
+    if (existing.userId !== parseInt(userId, 10)) {
+       return res.status(403).json({ success: false, message: 'Unauthorized deletion' });
+    }
+
+    await prisma.resource.delete({ where: { id: resourceId } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting resource:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
 // Mark doubt as resolved
 app.put('/api/doubts/:id/resolve', async (req, res) => {
   const doubtId = parseInt(req.params.id, 10);
