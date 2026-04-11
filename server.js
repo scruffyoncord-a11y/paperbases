@@ -102,7 +102,7 @@ app.post('/api/auth/google', async (req, res) => {
         await initializeSyllabus(user.id);
     }
 
-    res.json({ success: true, user });
+    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points, policiesAccepted: user.policiesAccepted } });
   } catch (error) {
     console.error('Error handling Google login:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -133,7 +133,7 @@ app.post('/api/auth/signup', async (req, res) => {
 
     await initializeSyllabus(user.id);
 
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points } });
+    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points, policiesAccepted: user.policiesAccepted } });
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -157,12 +157,11 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please login using Google' });
     }
 
-    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ success: false, message: 'Invalid credentials' });
     }
 
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points } });
+    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points, policiesAccepted: user.policiesAccepted } });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -181,9 +180,26 @@ app.get('/api/auth/validate/:userId', async (req, res) => {
     if (!user) {
       return res.json({ success: false, message: 'User not found' });
     }
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points } });
+    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points, policiesAccepted: user.policiesAccepted } });
   } catch (error) {
     console.error('Error validating user:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Mark legal policies as accepted
+app.post('/api/user/accept-policies', async (req, res) => {
+  const { userId } = req.body;
+  if (!userId) return res.status(400).json({ success: false, message: 'Missing userId' });
+
+  try {
+    const user = await prisma.user.update({
+      where: { id: parseInt(userId, 10) },
+      data: { policiesAccepted: true }
+    });
+    res.json({ success: true, policiesAccepted: user.policiesAccepted });
+  } catch (error) {
+    console.error('Error accepting policies:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });

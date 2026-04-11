@@ -1199,7 +1199,14 @@ export default function App() {
   const [authPage, setAuthPage] = useState('login');
   const [isExamActive, setIsExamActive] = useState(false);
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(() => {
-    return localStorage.getItem('paperbase_policies_accepted') === 'true';
+    // Check local storage first for speed, then sync from user object
+    const local = localStorage.getItem('paperbase_policies_accepted') === 'true';
+    if (local) return true;
+    const savedUser = localStorage.getItem('paperbase_user');
+    if (savedUser) {
+        return JSON.parse(savedUser).policiesAccepted === true;
+    }
+    return false;
   });
   const [showPolicyModal, setShowPolicyModal] = useState(false);
   const [pendingResource, setPendingResource] = useState(null);
@@ -1288,6 +1295,13 @@ export default function App() {
     }
   }, [syllabusMode, activeSubject, modeSubjects]);
 
+  // Section Gate: Policies must be accepted before entering Resources
+  useEffect(() => {
+    if (activeTab === 'Resources' && !hasAcceptedTerms) {
+       setShowPolicyModal(true);
+    }
+  }, [activeTab, hasAcceptedTerms]);
+
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('user');
@@ -1295,10 +1309,30 @@ export default function App() {
     setHasAcceptedTerms(false);
   };
 
-  const handleAcceptPolicies = () => {
-    localStorage.setItem('paperbase_policies_accepted', 'true');
+  const handleAcceptPolicies = async () => {
     setHasAcceptedTerms(true);
     setShowPolicyModal(false);
+    localStorage.setItem('paperbase_policies_accepted', 'true');
+    
+    if (user?.id) {
+       try {
+         const res = await fetch('/api/user/accept-policies', {
+           method: 'POST',
+           headers: { 'Content-Type': 'application/json' },
+           body: JSON.stringify({ userId: user.id })
+         });
+         const data = await res.json();
+         if (data.success) {
+           // Update local user object to sync state
+           const updatedUser = { ...user, policiesAccepted: true };
+           setUser(updatedUser);
+           localStorage.setItem('paperbase_user', JSON.stringify(updatedUser));
+         }
+       } catch (err) {
+         console.error("Failed to sync policy acceptance:", err);
+       }
+    }
+
     if (pendingResource) {
       setSelectedResource(pendingResource);
       setPendingResource(null);
@@ -1329,6 +1363,12 @@ export default function App() {
         .then(res => res.json())
         .then(data => {
           if (data.success) {
+            // Sync policies state from DB on login/refresh
+            if (data.user.policiesAccepted) {
+               setHasAcceptedTerms(true);
+               localStorage.setItem('paperbase_policies_accepted', 'true');
+            }
+            
             // User exists, now fetch their progress
             fetch(`/api/progress/${user.id}`)
               .then(r => r.json())
@@ -3413,7 +3453,11 @@ export default function App() {
       <PolicyAcceptanceModal 
         isOpen={showPolicyModal} 
         onAccept={handleAcceptPolicies} 
-        onCancel={() => { setShowPolicyModal(false); setPendingResource(null); }} 
+        onCancel={() => { 
+          setShowPolicyModal(false); 
+          setPendingResource(null); 
+          if(activeTab === 'Resources') setActiveTab('Home');
+        }} 
       />
     </div>
   );

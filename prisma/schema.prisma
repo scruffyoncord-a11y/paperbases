@@ -18,6 +18,7 @@ model User {
   streak    Int        @default(0)
   focusTime Int        @default(0) // minutes
   points    Int        @default(0) // gamification points for resources
+  policiesAccepted Boolean @default(false)
   progress  Progress[]
   doubts    Doubt[]
   replies   Reply[]
