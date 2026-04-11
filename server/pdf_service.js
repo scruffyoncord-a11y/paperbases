@@ -21,6 +21,11 @@ export async function extractTextFromPdf(source, options = {}) {
 
     if (Buffer.isBuffer(source)) {
       dataBuffer = source;
+    } else if (typeof source === 'string' && source.startsWith('data:')) {
+      // Handle Base64 Data URL
+      const base64Data = source.split(',')[1];
+      if (!base64Data) throw new Error('Invalid Data URL format');
+      dataBuffer = Buffer.from(base64Data, 'base64');
     } else if (typeof source === 'string' && source.startsWith('http')) {
       // Fetch remote PDF
       const response = await fetch(source);
