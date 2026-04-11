@@ -32,74 +32,10 @@ const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com'
 });
 
-// AI Content Moderation Helper (Two-Step: DeepSeek Context + Llama-Guard Safety)
+// AI Content Moderation Helper (DISABLED BY USER REQUEST)
 async function moderateContent(text) {
-  const textLength = text ? text.trim().length : 0;
-  console.log(`[Moderation] Starting scan. Extracted text length: ${textLength}`);
-
-  if (textLength < 5) {
-    return { 
-      safe: false, 
-      reason: "UNSAFE: The document content appears to be unreadable or empty. Please ensure your PDF has selectable text." 
-    };
-  }
-
-  if (!process.env.HF_TOKEN) {
-    console.warn("HF_TOKEN not found. Allowing document but AI moderation is inactive.");
-    return { safe: true };
-  }
-
-  try {
-    // Step 1: DeepSeek Contextual Summary
-    let contextSummary = "No context provided.";
-    if (process.env.DEEPSEEK_API_KEY && process.env.DEEPSEEK_API_KEY !== 'sk-empty') {
-        const dsResponse = await deepseek.chat.completions.create({
-            model: "deepseek-chat",
-            messages: [
-                { role: "system", content: "You are an educational document analyzer. Read the provided text and write a 1-sentence summary of what this document is. If it consists largely of math or science formulas, state 'This is a mathematical formula sheet or scientific technical document.' Keep it objective." },
-                { role: "user", content: text.substring(0, 5000) }
-            ],
-            temperature: 0,
-        });
-        contextSummary = dsResponse.choices[0].message.content.trim();
-        console.log(`[Moderation] DeepSeek Context: ${contextSummary}`);
-    }
-
-    // Step 2: Hugging Face Llama-Guard Safety Check
-    const hfClient = new OpenAI({
-      baseURL: "https://router.huggingface.co/v1",
-      apiKey: process.env.HF_TOKEN,
-    });
-
-    const guardPrompt = `Context: ${contextSummary}\n\nDocument Text:\n${text.substring(0, 8000)}`;
-
-    const response = await hfClient.chat.completions.create({
-      model: "meta-llama/Llama-Guard-3-8B",
-      messages: [
-        {
-          role: "user",
-          content: guardPrompt
-        }
-      ],
-      temperature: 0,
-    });
-
-    const result = response.choices[0].message.content.trim();
-    const isSafe = result.toLowerCase().includes("safe") && !result.toLowerCase().includes("unsafe");
-    
-    console.log(`[Moderation] Llama-Guard Result: ${result}`);
-    
-    return { 
-      safe: isSafe, 
-      reason: isSafe ? "SAFE" : `UNSAFE: ${result}` 
-    };
-  } catch (error) {
-    console.error("AI Moderation error:", error);
-    return { 
-      safe: false, 
-      reason: "Could not verify safety. Please try again in 1 minute." 
-    };
-  }
+  // Always allow for maximum speed and zero filtering
+  return { safe: true, reason: "SAFE" };
 }
 
 // Unified Syllabus Dataset
