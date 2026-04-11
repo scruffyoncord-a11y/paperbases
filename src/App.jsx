@@ -1481,6 +1481,14 @@ export default function App() {
       const data = await res.json();
       if (data.success) {
         setDbResources(prev => prev.map(r => r.id === resourceId ? data.resource : r));
+        if (selectedResource?.id === resourceId) {
+            setSelectedResource(prev => ({
+                ...prev,
+                likes: data.resource.likes,
+                dislikes: data.resource.dislikes,
+                _count: data.resource._count
+            }));
+        }
       }
     } catch (error) {
        console.error("Dislike error:", error);
@@ -1861,6 +1869,7 @@ export default function App() {
                 setSelectedResource(prev => ({
                     ...prev,
                     likes: data.resource.likes,
+                    dislikes: data.resource.dislikes,
                     _count: data.resource._count
                 }));
             }
