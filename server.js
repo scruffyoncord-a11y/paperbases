@@ -34,11 +34,14 @@ const deepseek = new OpenAI({
 
 // AI Content Moderation Helper (Using Llama-Guard-3 via HF Router)
 async function moderateContent(text) {
-  // Fail-Closed: If text is empty or too short, block it by default
-  if (!text || text.trim().length < 50) {
+  const textLength = text ? text.trim().length : 0;
+  console.log(`[Moderation] Starting scan. Extracted text length: ${textLength}`);
+
+  // Refined threshold for math-heavy/formula PDFs
+  if (textLength < 5) {
     return { 
       safe: false, 
-      reason: "UNSAFE: The document content is too short or could not be read (e.g. image-only PDF). Please ensure text is selectable for verification." 
+      reason: "UNSAFE: The document content appears to be unreadable or empty (less than 5 characters). Please ensure your PDF has selectable text." 
     };
   }
 
