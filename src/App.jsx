@@ -739,33 +739,38 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
         </div>
 
         {/* ===== PaperAI Sidebar ===== */}
-        <div className="w-[420px] bg-white dark:bg-[#161923] border-l border-slate-200 dark:border-white/10 flex flex-col shrink-0 overflow-hidden">
+        <div className="w-[480px] bg-white/60 dark:bg-[#161923]/60 backdrop-blur-2xl border-l border-slate-200 dark:border-white/10 flex flex-col shrink-0 overflow-hidden relative shadow-2xl">
+            {/* Subtle Inner Glow */}
+            <div className="absolute inset-x-0 top-0 h-[1px] bg-white/20 dark:bg-white/5 pointer-events-none" />
+            
             {/* Sidebar Tab Switcher */}
-            <div className="flex border-b border-slate-100 dark:border-white/5 shrink-0">
+            <div className="flex border-b border-slate-100 dark:border-white/10 shrink-0 bg-white/40 dark:bg-black/20 backdrop-blur-md">
               <button
                 onClick={() => setSidebarTab('chat')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-[11px] font-black uppercase tracking-[0.15em] transition-all relative ${
+                className={`flex-1 flex items-center justify-center gap-2 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative group ${
                   sidebarTab === 'chat'
-                    ? 'text-violet-600 dark:text-violet-400 bg-violet-500/5'
+                    ? 'text-violet-600 dark:text-violet-400 bg-violet-500/[0.03]'
                     : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                 }`}
               >
-                <Bot size={15} />
-                PaperAI
-                {sidebarTab === 'chat' && <div className="absolute bottom-0 inset-x-4 h-[2px] bg-violet-500 rounded-full" />}
+                <div className={`absolute inset-0 bg-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity ${sidebarTab === 'chat' ? 'opacity-100' : ''}`} />
+                <Bot size={14} className={sidebarTab === 'chat' ? 'animate-bounce' : ''} />
+                <span className="relative z-10">PaperAI</span>
+                {sidebarTab === 'chat' && <div className="absolute bottom-0 inset-x-6 h-[2px] bg-gradient-to-r from-violet-500 to-blue-500 rounded-full shadow-[0_0_10px_rgba(139,92,246,0.5)]" />}
               </button>
               <button
                 onClick={() => setSidebarTab('highlights')}
-                className={`flex-1 flex items-center justify-center gap-2 py-3.5 text-[11px] font-black uppercase tracking-[0.15em] transition-all relative ${
+                className={`flex-1 flex items-center justify-center gap-2 py-4 text-[10px] font-black uppercase tracking-[0.2em] transition-all relative group ${
                   sidebarTab === 'highlights'
-                    ? 'text-amber-600 dark:text-amber-400 bg-amber-500/5'
+                    ? 'text-amber-600 dark:text-amber-400 bg-amber-500/[0.03]'
                     : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                 }`}
               >
-                <Highlighter size={15} />
-                Highlights
-                {highlights.length > 0 && <span className="text-[9px] font-bold bg-amber-500/10 text-amber-500 px-1.5 py-0.5 rounded-full ml-1">{highlights.length}</span>}
-                {sidebarTab === 'highlights' && <div className="absolute bottom-0 inset-x-4 h-[2px] bg-amber-500 rounded-full" />}
+                <div className={`absolute inset-0 bg-amber-500/10 opacity-0 group-hover:opacity-100 transition-opacity ${sidebarTab === 'highlights' ? 'opacity-100' : ''}`} />
+                <Highlighter size={14} />
+                <span className="relative z-10">Highlights</span>
+                {highlights.length > 0 && <span className="relative z-10 text-[9px] font-black bg-amber-500/20 text-amber-500 px-2 py-0.5 rounded-full ml-1 border border-amber-500/20">{highlights.length}</span>}
+                {sidebarTab === 'highlights' && <div className="absolute bottom-0 inset-x-6 h-[2px] bg-gradient-to-r from-amber-500 to-orange-500 rounded-full shadow-[0_0_10px_rgba(245,158,11,0.5)]" />}
               </button>
             </div>
 
@@ -784,37 +789,41 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                 )}
 
                 {/* Chat Header */}
-                <div className="px-4 py-3 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-slate-50/50 dark:bg-white/[0.02]">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shadow-lg shadow-violet-500/20">
-                      <Bot size={14} className="text-white" />
+                <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-white/20 dark:bg-white/[0.01]">
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shadow-xl shadow-violet-500/30">
+                      <Bot size={18} className="text-white" />
                     </div>
                     <div>
-                      <h4 className="text-[11px] font-black text-slate-900 dark:text-white uppercase tracking-wider leading-none">PaperAI</h4>
-                      <p className="text-[9px] text-slate-400 mt-0.5">{highlights.length} highlight{highlights.length !== 1 ? 's' : ''} in context</p>
+                      <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider leading-none">PaperAI Assistant</h4>
+                      <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5 font-bold flex items-center gap-1.5">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                        {highlights.length} highlight{highlights.length !== 1 ? 's' : ''} sync'd
+                      </p>
                     </div>
                   </div>
                   <button
                     onClick={startNewChat}
                     title="New conversation"
-                    className="w-7 h-7 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-400 hover:text-violet-500 hover:border-violet-500/30 transition-all"
+                    className="w-9 h-9 rounded-xl bg-white/50 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-400 hover:text-violet-500 hover:border-violet-500/30 hover:scale-105 active:scale-95 transition-all shadow-sm"
                   >
-                    <RotateCcw size={13} />
+                    <RotateCcw size={14} />
                   </button>
                 </div>
 
                 {/* Messages Area */}
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
                   {chatMessages.length === 0 && !isChatLoading && (
-                    <div className="flex flex-col items-center justify-center py-12 px-6 text-center">
-                      <div className="w-20 h-20 rounded-3xl bg-gradient-to-br from-violet-500/10 to-blue-500/10 border border-violet-500/10 flex items-center justify-center mb-5">
-                        <Bot size={36} className="text-violet-500/60" />
+                    <div className="flex flex-col items-center justify-center py-16 px-8 text-center bg-violet-500/[0.01] rounded-[3rem] m-2 border border-violet-500/5">
+                      <div className="w-24 h-24 rounded-[2.5rem] bg-gradient-to-br from-violet-500/20 to-blue-500/20 border border-violet-500/10 flex items-center justify-center mb-6 shadow-2xl relative group">
+                        <div className="absolute inset-0 bg-violet-500/20 blur-2xl rounded-full opacity-30 group-hover:opacity-50 transition-opacity" />
+                        <Bot size={44} className="text-violet-500 relative z-10" />
                       </div>
-                      <h4 className="text-sm font-black text-slate-900 dark:text-white mb-2">Hey! I'm PaperAI 🧠</h4>
-                      <p className="text-xs text-slate-500 leading-relaxed mb-6 max-w-[260px]">
-                        I can help you understand this document. Ask me anything about the content, your highlights, or the subject.
+                      <h4 className="text-base font-black text-slate-900 dark:text-white mb-3 tracking-tight">Meet PaperAI ✨</h4>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 max-w-[280px]">
+                        Your personal study companion. Ask me to summarize sections, solve highlights, or generate practice questions based on the PDF.
                       </p>
-                      <div className="space-y-2 w-full">
+                      <div className="space-y-3 w-full max-w-[300px]">
                         {[
                           'Summarize this document',
                           highlights.length > 0 ? `Explain highlight #1` : 'What are the key concepts?',
@@ -823,10 +832,10 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                           <button
                             key={suggestion}
                             onClick={() => { setChatInput(suggestion); chatInputRef.current?.focus(); }}
-                            className="w-full text-left px-4 py-2.5 rounded-xl bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:border-violet-500/30 hover:text-violet-600 dark:hover:text-violet-400 transition-all group"
+                            className="w-full text-left px-5 py-3.5 rounded-2xl bg-white/50 dark:bg-white/[0.03] border border-slate-200 dark:border-white/10 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-400 hover:border-violet-500/40 hover:text-violet-600 dark:hover:text-violet-400 hover:scale-[1.02] active:scale-95 transition-all group flex items-center justify-between shadow-sm"
                           >
-                            <span className="text-violet-500 mr-2 opacity-50 group-hover:opacity-100">→</span>
-                            {suggestion}
+                            <span>{suggestion}</span>
+                            <Zap size={12} className="text-violet-500 opacity-20 group-hover:opacity-100 transition-opacity" />
                           </button>
                         ))}
                       </div>
@@ -836,32 +845,33 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                   {chatMessages.map((msg, idx) => (
                     <div
                       key={msg.id || idx}
-                      className={`flex gap-2.5 animate-in fade-in slide-in-from-bottom-2 duration-300 ${
+                      className={`flex gap-3 animate-in fade-in slide-in-from-bottom-3 duration-500 ${
                         msg.role === 'user' ? 'justify-end' : 'justify-start'
                       }`}
-                      style={{ animationDelay: `${idx * 30}ms` }}
+                      style={{ animationDelay: `${idx * 40}ms` }}
                     >
                       {msg.role === 'assistant' && (
-                        <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shrink-0 mt-1 shadow-lg shadow-violet-500/20">
-                          <Bot size={14} className="text-white" />
+                        <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shrink-0 mt-1 shadow-xl shadow-violet-500/20 border border-white/10">
+                          <Bot size={16} className="text-white" />
                         </div>
                       )}
                       <div
-                        className={`max-w-[85%] rounded-2xl px-4 py-3 text-[13px] leading-relaxed ${
+                        className={`max-w-[88%] rounded-3xl px-5 py-4 text-[13px] leading-relaxed relative overflow-hidden group/msg ${
                           msg.role === 'user'
-                            ? 'bg-gradient-to-br from-violet-600 to-blue-600 text-white rounded-br-md shadow-lg shadow-violet-500/10'
-                            : 'bg-slate-100 dark:bg-white/[0.06] text-slate-800 dark:text-slate-200 rounded-bl-md border border-slate-200 dark:border-white/5'
+                            ? 'bg-gradient-to-br from-violet-600 to-blue-700 text-white rounded-br-md shadow-2xl shadow-violet-900/20'
+                            : 'bg-white/60 dark:bg-white/[0.04] backdrop-blur-xl text-slate-800 dark:text-slate-200 rounded-bl-md border border-slate-200/50 dark:border-white/5 shadow-xl'
                         }`}
                       >
+                        {msg.role === 'user' && <div className="absolute inset-0 bg-white/10 opacity-0 group-hover/msg:opacity-100 transition-opacity pointer-events-none" />}
                         {msg.role === 'assistant' ? (
                           <ChatMessageContent content={msg.content} />
                         ) : (
-                          <span className="font-medium">{msg.content}</span>
+                          <span className="font-bold tracking-tight">{msg.content}</span>
                         )}
                       </div>
                       {msg.role === 'user' && (
-                        <div className="w-7 h-7 rounded-xl bg-slate-200 dark:bg-white/10 flex items-center justify-center shrink-0 mt-1">
-                          <User size={14} className="text-slate-500" />
+                        <div className="w-8 h-8 rounded-2xl bg-white/50 dark:bg-white/10 backdrop-blur-md flex items-center justify-center shrink-0 mt-1 border border-slate-200 dark:border-white/10 shadow-sm">
+                          <User size={16} className="text-slate-500 dark:text-slate-400" />
                         </div>
                       )}
                     </div>
@@ -887,8 +897,10 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                 </div>
 
                 {/* Chat Input */}
-                <div className="p-3 bg-white dark:bg-black/20 border-t border-slate-100 dark:border-white/5">
-                  <div className="flex items-end gap-2 bg-slate-50 dark:bg-white/[0.03] rounded-2xl border border-slate-200 dark:border-white/10 p-1.5 focus-within:border-violet-500/40 transition-colors">
+                <div className="p-4 bg-white/40 dark:bg-black/20 backdrop-blur-xl border-t border-slate-200/50 dark:border-white/5 relative">
+                  <div className="absolute inset-x-0 -top-px h-px bg-gradient-to-r from-transparent via-violet-500/20 to-transparent" />
+                  
+                  <div className="flex items-end gap-3 bg-white/80 dark:bg-white/[0.02] rounded-[1.75rem] border border-slate-200 dark:border-white/10 p-2 focus-within:border-violet-500/50 focus-within:ring-4 focus-within:ring-violet-500/5 transition-all shadow-lg">
                     <textarea
                       ref={chatInputRef}
                       value={chatInput}
@@ -896,17 +908,20 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                       onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); } }}
                       placeholder="Ask PaperAI anything..."
                       rows={1}
-                      className="flex-1 bg-transparent text-sm text-slate-900 dark:text-white placeholder:text-slate-400 outline-none resize-none px-3 py-2 max-h-24"
+                      className="flex-1 bg-transparent text-[14px] font-bold text-slate-900 dark:text-white placeholder:text-slate-400 outline-none resize-none px-4 py-3 max-h-32 no-scrollbar"
                     />
                     <button
                       onClick={sendChatMessage}
                       disabled={!chatInput.trim() || isChatLoading}
-                      className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-blue-600 text-white flex items-center justify-center hover:shadow-lg hover:shadow-violet-500/25 active:scale-90 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:shadow-none shrink-0"
+                      className="w-11 h-11 rounded-2xl bg-gradient-to-br from-violet-600 to-blue-600 text-white flex items-center justify-center hover:shadow-[0_8px_30px_rgba(124,58,237,0.4)] hover:scale-105 active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed disabled:hover:scale-100 disabled:hover:shadow-none shrink-0"
                     >
-                      <Send size={16} />
+                      <Send size={18} />
                     </button>
                   </div>
-                  <p className="text-[9px] text-slate-400 text-center mt-2 font-medium">PaperAI uses your highlights & document as context</p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 text-center mt-3 font-bold uppercase tracking-widest opacity-60 flex items-center justify-center gap-2">
+                    <Sparkles size={10} className="text-violet-500" />
+                    Powered by DeepSeek-V3
+                  </p>
                 </div>
               </>
             )}
