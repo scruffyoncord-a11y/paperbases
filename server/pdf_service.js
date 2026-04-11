@@ -14,36 +14,43 @@ export async function extractTextFromPdf(source, options = {}) {
   const { maxPages = 10 } = options;
 
   try {
-    // Dynamic import to avoid issues if not installed
-    const pdfParse = (await import('pdf-parse')).default;
-
     let dataBuffer;
 
     if (Buffer.isBuffer(source)) {
       dataBuffer = source;
     } else if (typeof source === 'string' && source.startsWith('data:')) {
-      // Handle Base64 Data URL
       const base64Data = source.split(',')[1];
       if (!base64Data) throw new Error('Invalid Data URL format');
       dataBuffer = Buffer.from(base64Data, 'base64');
     } else if (typeof source === 'string' && source.startsWith('http')) {
-      // Fetch remote PDF
       const response = await fetch(source);
       if (!response.ok) throw new Error(`Failed to fetch PDF: ${response.status}`);
       const arrayBuffer = await response.arrayBuffer();
       dataBuffer = Buffer.from(arrayBuffer);
     } else if (typeof source === 'string') {
-      // Local file path
+      const fs = await import('fs');
       dataBuffer = fs.readFileSync(source);
     } else {
-      throw new Error('Invalid source: must be a Buffer, URL string, or file path.');
+      throw new Error('Invalid source');
     }
 
-    const result = await pdfParse(dataBuffer, {
-      max: maxPages, // Limit pages for performance
-    });
+    const pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    
+    const uint8Array = new Uint8Array(dataBuffer);
+    const loadingTask = pdfjsLib.getDocument({ data: uint8Array, useSystemFonts: true });
+    const pdf = await loadingTask.promise;
+    
+    let fullText = '';
+    const numPages = Math.min(pdf.numPages, maxPages);
 
-    return result.text || '';
+    for (let i = 1; i <= numPages; i++) {
+        const page = await pdf.getPage(i);
+        const textContent = await page.getTextContent();
+        const pageText = textContent.items.map(item => item.str).join(' ');
+        fullText += pageText + ' \n';
+    }
+
+    return fullText.trim();
   } catch (error) {
     console.error('PDF text extraction failed:', error.message);
     return '';
