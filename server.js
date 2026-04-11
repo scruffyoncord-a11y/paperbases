@@ -46,7 +46,7 @@ async function moderateContent(text) {
       messages: [
         { 
           role: "system", 
-          content: "You are a content moderator for an educational platform called PaperBase. Check the following text for explicit content, hate speech, severe harassment, or illegal material. Respond with exactly 'SAFE' if the content is educational and appropriate, or 'UNSAFE' followed by a brief reason if it contains inappropriate material."
+          content: "You are a content moderator for an educational platform called PaperBase. Check the following text for explicit content, hate speech, severe harassment, or dangerous/illegal objects (specifically detailed weapon schematics or firearm assembly instructions). Respond with exactly 'SAFE' if the content is purely academic and appropriate, or 'UNSAFE' followed by a brief reason if it contains inappropriate material."
         },
         { role: "user", content: text.substring(0, 8000) }
       ],
