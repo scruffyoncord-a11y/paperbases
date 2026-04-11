@@ -1242,6 +1242,67 @@ function EditResourceModal({ resource, onClose, onUpdate, isUpdating }) {
   );
 }
 
+function ReportResourceModal({ resource, onClose, onReport }) {
+  const [reason, setReason] = React.useState('Inappropriate Content');
+  const [details, setDetails] = React.useState('');
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+
+  const REASONS = [
+    'Inappropriate Content',
+    'Incorrect Information',
+    'Copyright Violation',
+    'Spam / Low Quality',
+    'Other'
+  ];
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    await onReport(resource.id, reason, details);
+    setIsSubmitting(false);
+  };
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-[#0f1219] w-full max-w-md rounded-[2.5rem] shadow-2xl border border-slate-200 dark:border-white/5 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="p-8 border-b border-slate-100 dark:border-white/5 flex justify-between items-center bg-amber-500/5">
+           <div className="flex items-center gap-3 text-amber-600 dark:text-amber-500">
+              <AlertTriangle size={24} />
+              <h2 className="text-xl font-black tracking-tight">Report Resource</h2>
+           </div>
+           <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 dark:hover:bg-white/5 transition-colors"><X size={20} className="text-slate-400" /></button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-8 space-y-6">
+           <div className="space-y-4">
+              <p className="text-sm font-medium text-slate-500 dark:text-slate-400">Reporting: <span className="text-slate-900 dark:text-white font-bold">{resource?.title}</span></p>
+              
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Reason</label>
+                 <select value={reason} onChange={e => setReason(e.target.value)} className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-4 py-3.5 outline-none focus:border-amber-500 transition-all font-bold text-slate-900 dark:text-white">
+                    {REASONS.map(r => <option key={r} value={r}>{r}</option>)}
+                 </select>
+              </div>
+
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Additional Details</label>
+                 <textarea value={details} onChange={e => setDetails(e.target.value)} placeholder="Tell us more about the issue..." rows="3" className="w-full bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 rounded-2xl px-5 py-3.5 outline-none focus:border-amber-500 transition-all font-bold text-slate-900 dark:text-white resize-none placeholder:text-slate-400" />
+              </div>
+           </div>
+           
+           <div className="flex gap-4 pt-2">
+              <button type="button" onClick={onClose} className="flex-1 py-4 rounded-2xl border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 font-bold text-sm hover:bg-slate-50 dark:hover:bg-white/5 transition-all">Cancel</button>
+              <button disabled={isSubmitting} type="submit" className="flex-[2] py-4 rounded-2xl bg-amber-600 text-white font-black text-sm shadow-xl shadow-amber-600/20 hover:bg-amber-700 transition-all flex items-center justify-center gap-2">
+                 {isSubmitting ? <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Flag size={18} />}
+                 {isSubmitting ? 'SUBMITTING...' : 'SUBMIT REPORT'}
+              </button>
+           </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 export default function App() {
   const [user, setUser] = useState(() => {
     try {
@@ -1308,6 +1369,8 @@ export default function App() {
   const [showUploadModal, setShowUploadModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [resourceFile, setResourceFile] = useState(null);
+  const [reportingResource, setReportingResource] = useState(null);
+  const [editingResource, setEditingResource] = useState(null);
   const [editingResource, setEditingResource] = useState(null);
   const [isUpdatingResource, setIsUpdatingResource] = useState(false);
 
@@ -1400,6 +1463,58 @@ export default function App() {
     if (pendingResource) {
       setSelectedResource(pendingResource);
       setPendingResource(null);
+    }
+  };
+
+  const handleLikeResource = async (resourceId) => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`/api/resources/${resourceId}/like`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDbResources(prev => prev.map(r => r.id === resourceId ? data.resource : r));
+      }
+    } catch (error) {
+       console.error("Like error:", error);
+    }
+  };
+
+  const handleDislikeResource = async (resourceId) => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`/api/resources/${resourceId}/dislike`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setDbResources(prev => prev.map(r => r.id === resourceId ? data.resource : r));
+      }
+    } catch (error) {
+       console.error("Dislike error:", error);
+    }
+  };
+
+  const handleReportResource = async (resourceId, reason, details) => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`/api/resources/${resourceId}/report`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, reason, details })
+      });
+      const data = await res.json();
+      if (data.success) {
+        alert("Thank you for your report. Our team will review this content.");
+        setReportingResource(null);
+      }
+    } catch (error) {
+       console.error("Report error:", error);
     }
   };
 
@@ -2123,6 +2238,7 @@ export default function App() {
 
   const ResourceCard = ({ res }) => {
     const hasLiked = res.likes?.some(l => l.userId === user?.id);
+    const hasDisliked = res.dislikes?.some(d => d.userId === user?.id);
     return (
       <div 
         onClick={(e) => { if(e.target.closest('button') || e.target.closest('a')) return; openResource(res); }} 
@@ -2159,9 +2275,20 @@ export default function App() {
               <span className="text-[10px] font-bold text-slate-600 dark:text-slate-400">{res.user.name}</span>
             </div>
             <div className="flex items-center gap-3">
-              <button onClick={() => handleLikeResource(res.id)} className={`flex items-center gap-1 text-[11px] font-black transition-colors ${hasLiked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500'}`}>
-                <ThumbsUp size={14} className={hasLiked ? 'fill-rose-500' : ''} /> {res._count?.likes || 0}
+              <div className="flex items-center bg-slate-50 dark:bg-white/5 rounded-full px-2 py-1 border border-slate-200 dark:border-white/10">
+                <button onClick={() => handleLikeResource(res.id)} className={`p-1 flex items-center gap-1 text-[11px] font-black transition-all ${hasLiked ? 'text-blue-500' : 'text-slate-400 hover:text-blue-500 hover:scale-110 active:scale-90'}`}>
+                  <ThumbsUp size={14} className={hasLiked ? 'fill-blue-500' : ''} /> {res._count?.likes || 0}
+                </button>
+                <div className="w-[1px] h-3 bg-slate-200 dark:bg-white/10 mx-1" />
+                <button onClick={() => handleDislikeResource(res.id)} className={`p-1 flex items-center gap-1 text-[11px] font-black transition-all ${hasDisliked ? 'text-rose-500' : 'text-slate-400 hover:text-rose-500 hover:scale-110 active:scale-90'}`}>
+                  <ThumbsDown size={14} className={hasDisliked ? 'fill-rose-500' : ''} /> {res._count?.dislikes || 0}
+                </button>
+              </div>
+              
+              <button onClick={() => setReportingResource(res)} className="p-2 rounded-lg text-slate-400 hover:text-amber-500 hover:bg-amber-500/10 transition-colors" title="Report Resource">
+                 <AlertTriangle size={14} />
               </button>
+
               <a href={res.fileUrl} download={res.title} className="w-8 h-8 rounded-full bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-500 flex items-center justify-center hover:bg-blue-600 hover:text-white transition-all">
                 <UploadCloud size={16} />
               </a>
@@ -3510,6 +3637,14 @@ export default function App() {
             onClose={() => setEditingResource(null)} 
             onUpdate={handleUpdateResource}
             isUpdating={isUpdatingResource}
+         />
+      )}
+
+      {reportingResource && (
+         <ReportResourceModal 
+            resource={reportingResource} 
+            onClose={() => setReportingResource(null)} 
+            onReport={handleReportResource}
          />
       )}
 

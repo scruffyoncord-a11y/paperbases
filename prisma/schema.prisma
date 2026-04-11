@@ -24,6 +24,8 @@ model User {
   replies   Reply[]
   resources Resource[]
   resourceLikes ResourceLike[]
+  resourceDislikes ResourceDislike[]
+  resourceReports  ResourceReport[]
   tasks       Task[]
   schedules   ScheduleSlot[]
   highlights  Highlight[]
@@ -43,6 +45,8 @@ model Resource {
   userId      Int
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   likes       ResourceLike[]
+  dislikes    ResourceDislike[]
+  reports     ResourceReport[]
   highlights  Highlight[]
   chats       Chat[]
   createdAt   DateTime @default(now())
@@ -61,6 +65,28 @@ model ResourceLike {
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([resourceId, userId])
+}
+
+model ResourceDislike {
+  id         Int      @id @default(autoincrement())
+  resourceId Int
+  userId     Int
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([resourceId, userId])
+}
+
+model ResourceReport {
+  id         Int      @id @default(autoincrement())
+  resourceId Int
+  userId     Int
+  reason     String
+  details    String?
+  status     String   @default("Pending") // Pending, Reviewed, Actioned
+  createdAt  DateTime @default(now())
+  resource   Resource @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Task {

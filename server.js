@@ -446,8 +446,9 @@ app.get('/api/resources', async (req, res) => {
       select: {
           id: true, title: true, description: true, subject: true, tag: true, fileType: true, fileUrl: true, userId: true, createdAt: true,
           user: { select: { id: true, name: true, picture: true } },
-          _count: { select: { likes: true } },
-          likes: { select: { userId: true } }
+          _count: { select: { likes: true, dislikes: true } },
+          likes: { select: { userId: true } },
+          dislikes: { select: { userId: true } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -465,8 +466,9 @@ app.get('/api/resources/:id', async (req, res) => {
       where: { id: parseInt(req.params.id, 10) },
       include: {
         user: { select: { id: true, name: true, picture: true } },
-        _count: { select: { likes: true } },
-        likes: { select: { userId: true } }
+        _count: { select: { likes: true, dislikes: true, reports: true } },
+        likes: { select: { userId: true } },
+        dislikes: { select: { userId: true } }
       }
     });
     if (!resource) return res.status(404).json({ success: false, message: 'Resource not found' });
@@ -503,8 +505,9 @@ app.post('/api/resources', async (req, res) => {
       },
       include: {
         user: { select: { id: true, name: true, picture: true } },
-        _count: { select: { likes: true } },
-        likes: { select: { userId: true } }
+        _count: { select: { likes: true, dislikes: true } },
+        likes: { select: { userId: true } },
+        dislikes: { select: { userId: true } }
       }
     });
     res.json({ success: true, resource });
@@ -556,14 +559,81 @@ app.post('/api/resources/:id/like', async (req, res) => {
       where: { id: resourceId },
       include: {
         user: { select: { id: true, name: true, picture: true } },
-        _count: { select: { likes: true } },
-        likes: { select: { userId: true } }
+        _count: { select: { likes: true, dislikes: true } },
+        likes: { select: { userId: true } },
+        dislikes: { select: { userId: true } }
       }
     });
 
     res.json({ success: true, resource: updatedResource });
   } catch (error) {
     console.error('Error toggling like:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Toggle a dislike on a resource
+app.post('/api/resources/:id/dislike', async (req, res) => {
+  const resourceId = parseInt(req.params.id, 10);
+  const { userId } = req.body;
+
+  if (!userId) return res.status(400).json({ success: false, message: 'Missing userId' });
+
+  try {
+    const existingDislike = await prisma.resourceDislike.findUnique({
+      where: {
+        resourceId_userId: { resourceId, userId: parseInt(userId, 10) }
+      }
+    });
+
+    if (existingDislike) {
+      await prisma.resourceDislike.delete({ where: { id: existingDislike.id } });
+    } else {
+      // If user liked it, remove like first
+      await prisma.resourceLike.deleteMany({
+        where: { resourceId, userId: parseInt(userId, 10) }
+      });
+      await prisma.resourceDislike.create({
+        data: { resourceId, userId: parseInt(userId, 10) }
+      });
+    }
+
+    const updatedResource = await prisma.resource.findUnique({
+      where: { id: resourceId },
+      include: {
+        user: { select: { id: true, name: true, picture: true } },
+        _count: { select: { likes: true, dislikes: true } },
+        likes: { select: { userId: true } },
+        dislikes: { select: { userId: true } }
+      }
+    });
+
+    res.json({ success: true, resource: updatedResource });
+  } catch (error) {
+    console.error('Error toggling dislike:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Report a resource
+app.post('/api/resources/:id/report', async (req, res) => {
+  const resourceId = parseInt(req.params.id, 10);
+  const { userId, reason, details } = req.body;
+
+  if (!userId || !reason) return res.status(400).json({ success: false, message: 'Missing userId or reason' });
+
+  try {
+    const report = await prisma.resourceReport.create({
+      data: {
+        resourceId,
+        userId: parseInt(userId, 10),
+        reason,
+        details
+      }
+    });
+    res.json({ success: true, report });
+  } catch (error) {
+    console.error('Error reporting resource:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -591,8 +661,9 @@ app.put('/api/resources/:id', async (req, res) => {
       },
       include: {
         user: { select: { id: true, name: true, picture: true } },
-        _count: { select: { likes: true } },
-        likes: { select: { userId: true } }
+        _count: { select: { likes: true, dislikes: true } },
+        likes: { select: { userId: true } },
+        dislikes: { select: { userId: true } }
       }
     });
 
