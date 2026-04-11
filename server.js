@@ -32,34 +32,54 @@ const deepseek = new OpenAI({
   baseURL: 'https://api.deepseek.com'
 });
 
-// AI Content Moderation Helper
+// AI Content Moderation Helper (Using Llama-Guard-3 via HF Router)
 async function moderateContent(text) {
-  if (!text || text.length < 10) return { safe: true };
-  if (!process.env.DEEPSEEK_API_KEY || process.env.DEEPSEEK_API_KEY === 'sk-empty') {
-    console.warn("DEEPSEEK_API_KEY not found. Skipping AI moderation.");
+  // Fail-Closed: If text is empty or too short, block it by default
+  if (!text || text.trim().length < 50) {
+    return { 
+      safe: false, 
+      reason: "UNSAFE: The document content is too short or could not be read (e.g. image-only PDF). Please ensure text is selectable for verification." 
+    };
+  }
+
+  if (!process.env.HF_TOKEN) {
+    console.warn("HF_TOKEN not found. Allowing document but AI moderation is inactive.");
     return { safe: true };
   }
 
   try {
-    const response = await deepseek.chat.completions.create({
-      model: "deepseek-chat",
+    const hfClient = new OpenAI({
+      baseURL: "https://router.huggingface.co/v1",
+      apiKey: process.env.HF_TOKEN,
+    });
+
+    const response = await hfClient.chat.completions.create({
+      model: "meta-llama/Llama-Guard-3-8B",
       messages: [
-        { 
-          role: "system", 
-          content: "You are a content moderator for an educational platform called PaperBase. Check the following text for explicit content, hate speech, severe harassment, or dangerous/illegal objects (specifically detailed weapon schematics or firearm assembly instructions). Respond with exactly 'SAFE' if the content is purely academic and appropriate, or 'UNSAFE' followed by a brief reason if it contains inappropriate material."
-        },
-        { role: "user", content: text.substring(0, 8000) }
+        {
+          role: "user",
+          content: text.substring(0, 10000) // Llama-Guard can handle large context
+        }
       ],
       temperature: 0,
     });
 
     const result = response.choices[0].message.content.trim();
-    // Safety check: if result says UNSAFE anywhere, we flag it.
-    const isUnsafe = result.toUpperCase().includes('UNSAFE');
-    return { safe: !isUnsafe, reason: result };
+    const isSafe = result.toLowerCase().includes("safe") && !result.toLowerCase().includes("unsafe");
+    
+    console.log(`[Moderation] AI Result: ${result} for text length: ${text.length}`);
+    
+    return { 
+      safe: isSafe, 
+      reason: isSafe ? "SAFE" : `UNSAFE: ${result}` 
+    };
   } catch (error) {
     console.error("AI Moderation error:", error);
-    return { safe: true }; // Fail open for reliability, or change to fail closed for strictness
+    // Fail-Closed for security - if the API is down, we don't allow potentially unsafe uploads
+    return { 
+      safe: false, 
+      reason: "Could not verify safety. Please try again in 1 minute." 
+    };
   }
 }
 
