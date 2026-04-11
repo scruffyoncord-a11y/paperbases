@@ -428,7 +428,7 @@ app.get('/api/resources', async (req, res) => {
     const resources = await prisma.resource.findMany({
       where,
       select: {
-          id: true, title: true, description: true, subject: true, tag: true, fileType: true, userId: true, createdAt: true,
+          id: true, title: true, description: true, subject: true, tag: true, fileType: true, fileUrl: true, userId: true, createdAt: true,
           user: { select: { id: true, name: true, picture: true } },
           _count: { select: { likes: true } },
           likes: { select: { userId: true } }

@@ -1951,7 +1951,7 @@ export default function App() {
         onClick={(e) => { if(e.target.closest('button') || e.target.closest('a')) return; setSelectedResource(res); }} 
         className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm hover:border-blue-500 transition-all group cursor-pointer overflow-hidden flex flex-col"
       >
-        <div className="aspect-[2/1] w-full bg-slate-100 dark:bg-[#0B0E14] relative overflow-hidden flex items-center justify-center border-b border-slate-100 dark:border-white/5">
+        <div className="aspect-[3/1] w-full bg-slate-100 dark:bg-[#0B0E14] relative overflow-hidden flex items-center justify-center border-b border-slate-100 dark:border-white/5">
           <PdfThumbnail fileUrl={res.fileUrl} fileType={res.fileType} />
           <div className="absolute top-3 left-3 flex items-center gap-2">
             <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-white shadow-lg ${res.fileType === 'pdf' ? 'bg-rose-500' : 'bg-blue-500'}`}>
