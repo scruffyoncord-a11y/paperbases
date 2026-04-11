@@ -1825,17 +1825,25 @@ export default function App() {
   const PdfThumbnail = React.memo(({ fileUrl, fileType }) => {
     const canvasRef = React.useRef(null);
     const containerRef = React.useRef(null);
+    const renderingRef = React.useRef(false);
     const [status, setStatus] = React.useState('idle');
 
-    const [errorMsg, setErrorMsg] = React.useState('');
-
+    // Trigger loading via IntersectionObserver or fallback timeout
     useEffect(() => {
       if (fileType !== 'pdf' || !fileUrl) return;
+      let triggered = false;
       
+      const trigger = () => {
+        if (!triggered) {
+          triggered = true;
+          setStatus(prev => prev === 'idle' ? 'loading' : prev);
+        }
+      };
+
       const observer = new IntersectionObserver(
         ([entry]) => { 
           if (entry.isIntersecting) { 
-            setStatus('loading'); 
+            trigger();
             observer.disconnect(); 
           } 
         },
@@ -1844,38 +1852,52 @@ export default function App() {
       
       if (containerRef.current) observer.observe(containerRef.current);
       
-      const timer = setTimeout(() => {
-        if (status === 'idle') setStatus('loading');
-      }, 500); // Faster fallback
+      const timer = setTimeout(trigger, 500);
 
       return () => {
         observer.disconnect();
         clearTimeout(timer);
       };
-    }, [fileUrl, fileType, status]);
+    }, [fileUrl, fileType]);
 
+    // Render the PDF page to canvas
     useEffect(() => {
-      if (status !== 'loading' || fileType !== 'pdf') return;
+      if (status !== 'loading' || fileType !== 'pdf' || renderingRef.current) return;
+      renderingRef.current = true;
       let cancelled = false;
       
       const render = async () => {
         try {
-          const loadingTask = pdfjsGetDocument({
-            url: fileUrl,
+          // Build pdf.js source - handle data URLs by extracting binary data
+          const docParams = {
             cMapUrl: 'https://unpkg.com/pdfjs-dist@4.4.168/cmaps/',
             cMapPacked: true,
-          });
-          
+          };
+
+          if (fileUrl.startsWith('data:')) {
+            // Extract base64 from data URL and convert to Uint8Array
+            const base64 = fileUrl.split(',')[1];
+            const binaryStr = atob(base64);
+            const bytes = new Uint8Array(binaryStr.length);
+            for (let i = 0; i < binaryStr.length; i++) {
+              bytes[i] = binaryStr.charCodeAt(i);
+            }
+            docParams.data = bytes;
+          } else {
+            docParams.url = fileUrl;
+          }
+
+          const loadingTask = pdfjsGetDocument(docParams);
           const pdf = await loadingTask.promise;
-          if (cancelled) return;
+          if (cancelled) { pdf.destroy(); return; }
           
           const page = await pdf.getPage(1);
-          if (cancelled) return;
+          if (cancelled) { pdf.destroy(); return; }
           
-          const scale = 0.8;
+          const scale = 0.6;
           const viewport = page.getViewport({ scale });
           const canvas = canvasRef.current;
-          if (!canvas || cancelled) return;
+          if (!canvas || cancelled) { pdf.destroy(); return; }
           
           canvas.width = viewport.width;
           canvas.height = viewport.height;
@@ -1890,6 +1912,8 @@ export default function App() {
         } catch (err) {
           console.error("PDF Preview Error:", err);
           if (!cancelled) setStatus('error');
+        } finally {
+          renderingRef.current = false;
         }
       };
       
@@ -1902,16 +1926,16 @@ export default function App() {
     }
 
     return (
-      <div ref={containerRef} className="w-full h-full min-h-[120px] flex items-center justify-center bg-slate-50 dark:bg-[#0B0E14]">
+      <div ref={containerRef} className="w-full h-full flex items-center justify-center bg-slate-50 dark:bg-[#0B0E14]">
         <canvas ref={canvasRef} className={`w-full h-full object-cover ${status === 'loaded' ? 'block' : 'hidden'}`} />
         {status !== 'loaded' && (
           <div className="flex flex-col items-center gap-2">
             {status === 'loading' ? (
-              <div className="w-6 h-6 border-2 border-slate-200 dark:border-slate-800 border-t-blue-500 rounded-full animate-spin" />
+              <div className="w-5 h-5 border-2 border-slate-200 dark:border-slate-800 border-t-blue-500 rounded-full animate-spin" />
             ) : (
-              <div className="flex flex-col items-center gap-2 opacity-20">
-                <FileText size={40} className="text-slate-400" />
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-500">No Preview</span>
+              <div className="flex flex-col items-center gap-1.5 opacity-20">
+                <FileText size={28} className="text-slate-400" />
+                <span className="text-[9px] font-bold uppercase tracking-widest text-slate-500">No Preview</span>
               </div>
             )}
           </div>
@@ -1927,7 +1951,7 @@ export default function App() {
         onClick={(e) => { if(e.target.closest('button') || e.target.closest('a')) return; setSelectedResource(res); }} 
         className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-2xl shadow-sm hover:border-blue-500 transition-all group cursor-pointer overflow-hidden flex flex-col"
       >
-        <div className="aspect-[16/9] w-full bg-slate-100 dark:bg-[#0B0E14] relative overflow-hidden flex items-center justify-center border-b border-slate-100 dark:border-white/5">
+        <div className="aspect-[2/1] w-full bg-slate-100 dark:bg-[#0B0E14] relative overflow-hidden flex items-center justify-center border-b border-slate-100 dark:border-white/5">
           <PdfThumbnail fileUrl={res.fileUrl} fileType={res.fileType} />
           <div className="absolute top-3 left-3 flex items-center gap-2">
             <span className={`px-2 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest text-white shadow-lg ${res.fileType === 'pdf' ? 'bg-rose-500' : 'bg-blue-500'}`}>
