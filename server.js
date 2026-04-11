@@ -543,6 +543,10 @@ app.post('/api/resources/:id/like', async (req, res) => {
         });
       }
     } else {
+      // If user disliked it, remove dislike first
+      await prisma.resourceDislike.deleteMany({
+        where: { resourceId, userId: parseInt(userId, 10) }
+      });
       await prisma.resourceLike.create({
         data: { resourceId, userId: parseInt(userId, 10) }
       });
