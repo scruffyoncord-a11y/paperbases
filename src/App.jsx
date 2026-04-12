@@ -321,6 +321,35 @@ const PomodoroTimer = ({ children }) => {
   );
 };
 
+// Flashcard Component
+const Flashcard = ({ question, answer }) => {
+  const [flipped, setFlipped] = useState(false);
+  
+  return (
+    <div 
+        onClick={() => setFlipped(!flipped)}
+        className="relative h-64 w-full perspective-1000 cursor-pointer group"
+    >
+        <div className={`relative w-full h-full transition-all duration-500 preserve-3d ${flipped ? 'rotate-y-180' : ''}`}>
+            {/* Front */}
+            <div className="absolute inset-0 backface-hidden bg-white dark:bg-[#161923] border border-slate-200 dark:border-white/10 rounded-3xl p-8 flex flex-col items-center justify-center text-center shadow-lg group-hover:border-blue-500 transition-colors">
+                <span className="text-[10px] font-black text-blue-500 uppercase tracking-[0.2em] mb-4">Question</span>
+                <p className="text-sm md:text-base font-bold text-slate-900 dark:text-white leading-relaxed">{question}</p>
+                <div className="absolute bottom-6 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase flex items-center gap-2">
+                    <RotateCcw size={10} /> Click to flip
+                </div>
+            </div>
+            
+            {/* Back */}
+            <div className="absolute inset-0 backface-hidden rotate-y-180 bg-slate-900 dark:bg-white rounded-3xl p-8 flex flex-col items-center justify-center text-center shadow-2xl">
+                <span className="text-[10px] font-black text-blue-400 dark:text-blue-500 uppercase tracking-[0.2em] mb-4">Core Concept</span>
+                <p className="text-sm md:text-base font-bold text-white dark:text-slate-900 leading-relaxed">{answer}</p>
+            </div>
+        </div>
+    </div>
+  );
+};
+
 // YouTube Resources Component
 const ChapterResources = ({ chapter, syllabusMode, videoCache, setVideoCache }) => {
   const [videos, setVideos] = useState([]);
@@ -1953,6 +1982,8 @@ export default function App() {
   const [aiStudyPlan, setAiStudyPlan] = useState('');
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
   const [videoCache, setVideoCache] = useState({});
+  const [flashcards, setFlashcards] = useState({});
+  const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
 
   const modeSubjects = useMemo(() => ({
     jee: ['Maths', 'Physics', 'Chemistry'],
@@ -3590,11 +3621,17 @@ export default function App() {
                     >
                         Highlights
                     </button>
+                    <button 
+                        onClick={() => setNoteTab('Flashcards')} 
+                        className={`px-5 py-2.5 rounded-xl text-sm font-bold transition-all border ${noteTab === 'Flashcards' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 border-slate-900 dark:border-white shadow-lg' : 'bg-white dark:bg-[#161923] text-slate-500 dark:text-slate-400 border-slate-200 dark:border-[#333942] hover:border-slate-400'}`}
+                    >
+                        Flashcards
+                    </button>
                 </div>
               </div>
 
-              {noteTab === 'My Notes' ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {noteTab === 'My Notes' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 animate-in fade-in duration-500">
                   {[
                     { title: 'Thermodynamics Laws', subject: 'Physics', date: 'Oct 12', color: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-500/20' },
                     { title: 'Organic Named Reactions', subject: 'Chemistry', date: 'Oct 10', color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-100 dark:border-emerald-500/20' },
@@ -3615,8 +3652,10 @@ export default function App() {
                     <span className="text-sm font-bold text-slate-400 group-hover:text-blue-500">Add New Note</span>
                   </div>
                 </div>
-              ) : (
-                <div className="space-y-4">
+              )}
+
+              {noteTab === 'My Highlights' && (
+                <div className="space-y-4 animate-in fade-in duration-500 pb-12">
                     {highlights.length === 0 ? (
                         <div className="py-24 text-center bg-slate-50/50 dark:bg-white/5 rounded-[2.5rem] border-2 border-dashed border-slate-200 dark:border-white/10 animate-in fade-in zoom-in duration-700">
                             <div className="w-20 h-20 bg-white dark:bg-[#0B0E14] rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-sm border border-slate-100 dark:border-white/5">
@@ -3626,7 +3665,7 @@ export default function App() {
                             <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs mx-auto">Your saved snippets and equations from PDFs will appear here for quick review.</p>
                         </div>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-12">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {highlights.map((h) => (
                                 <div key={h.id} className="bg-white dark:bg-[#161923] p-5 rounded-2xl border border-slate-200 dark:border-[#333942] shadow-sm flex flex-col gap-4 group">
                                     <div className="flex justify-between items-center">
@@ -3678,6 +3717,63 @@ export default function App() {
                             ))}
                         </div>
                     )}
+                </div>
+              )}
+
+              {noteTab === 'Flashcards' && (
+                <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-12">
+                    <div className="bg-white/80 dark:bg-white/5 backdrop-blur-xl border border-slate-200 dark:border-white/10 p-8 rounded-[2.5rem] flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center text-indigo-600 dark:text-indigo-400 border border-indigo-100 dark:border-indigo-500/20"><Zap size={28} /></div>
+                            <div>
+                                <h3 className="text-xl font-black text-slate-900 dark:text-white">AI Magic Flashcards</h3>
+                                <p className="text-xs font-bold text-slate-500 dark:text-slate-400">Transform any chapter into active recall cards.</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="relative flex-1 md:flex-none">
+                                <select 
+                                    value={studyChapter}
+                                    onChange={(e) => setStudyChapter(e.target.value)}
+                                    className="bg-slate-50 dark:bg-[#0B0E14] border border-slate-200 dark:border-white/10 rounded-2xl py-3.5 px-6 text-xs font-black text-slate-800 dark:text-slate-200 outline-none focus:border-indigo-500 transition-all cursor-pointer appearance-none min-w-[200px]"
+                                >
+                                    {UNIFIED_SYLLABUS[activeSubject]?.map(chap => <option key={chap} value={chap}>{chap}</option>)}
+                                </select>
+                                <ChevronDown size={14} className="absolute right-5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                            </div>
+                            <button 
+                                onClick={() => {
+                                    setIsGeneratingFlashcards(true);
+                                    setTimeout(() => {
+                                        const cards = [
+                                            { q: `What is the First Law of Thermodynamics for ${studyChapter}?`, a: "Energy cannot be created or destroyed, only transformed from one form to another." },
+                                            { q: `State the significance of Entropy in ${studyChapter}.`, a: "Entropy is a measure of molecular randomness or disorder in the system." },
+                                            { q: `Key formula for efficiency in ${studyChapter} cycles?`, a: "Efficiency (η) = Net work done (W) / Heat supplied (Q_in)" },
+                                            { q: `What is an Adiabatic process?`, a: "A process in which no heat is transferred to or from the system." }
+                                        ];
+                                        setFlashcards(prev => ({ ...prev, [studyChapter]: cards }));
+                                        setIsGeneratingFlashcards(false);
+                                    }, 2000);
+                                }}
+                                disabled={isGeneratingFlashcards}
+                                className="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-black px-8 py-3.5 rounded-2xl transition-all shadow-[0_10px_30px_rgba(79,70,229,0.3)] hover:scale-105 active:scale-95 disabled:opacity-50 disabled:scale-100 flex items-center gap-2"
+                            >
+                                {isGeneratingFlashcards ? <RotateCcw size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                                {isGeneratingFlashcards ? 'Brewing...' : 'Generate Cards'}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        {flashcards[studyChapter]?.map((card, i) => (
+                            <Flashcard key={i} question={card.q} answer={card.a} />
+                        )) || (
+                            <div className="col-span-full py-24 text-center">
+                                <Search size={48} className="mx-auto mb-4 text-slate-200 dark:text-white/5" />
+                                <p className="text-sm font-bold text-slate-400 dark:text-slate-500 font-medium">Pick a chapter and hit generate to start your active recall session.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
               )}
             </div>
