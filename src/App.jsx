@@ -3355,9 +3355,18 @@ export default function App() {
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div className="flex flex-col gap-2">
                   <h2 className="text-xl font-black text-slate-900 dark:text-white">Syllabus Tracker</h2>
-                  <div className="flex items-center gap-2 bg-white/80 dark:bg-white/5 backdrop-blur-md p-1 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm w-fit">
-                    <button onClick={() => setSyllabusMode('jee')} className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${syllabusMode === 'jee' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>JEE</button>
-                    <button onClick={() => setSyllabusMode('neet')} className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${syllabusMode === 'neet' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'}`}>NEET</button>
+                  <div className="flex items-center gap-2 bg-white/80 dark:bg-white/5 backdrop-blur-md p-1 rounded-xl border border-slate-200 dark:border-white/10 shadow-sm w-fit overflow-x-auto no-scrollbar max-w-[90vw]">
+                    <button onClick={() => setSyllabusMode('jee')} className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${syllabusMode === 'jee' ? 'bg-blue-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'}`}>JEE</button>
+                    <button onClick={() => setSyllabusMode('neet')} className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${syllabusMode === 'neet' ? 'bg-emerald-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'}`}>NEET</button>
+                    <button onClick={() => setSyllabusMode('bitsat')} className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${syllabusMode === 'bitsat' ? 'bg-amber-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                      <img src="/bitsat_logo.png" alt="" className="w-5 h-5 object-contain" /> BITSAT
+                    </button>
+                    <button onClick={() => setSyllabusMode('keam')} className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${syllabusMode === 'keam' ? 'bg-rose-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                      <img src="/keam_logo.png" alt="" className="w-5 h-5 object-contain" /> KEAM
+                    </button>
+                    <button onClick={() => setSyllabusMode('kcet')} className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-2 ${syllabusMode === 'kcet' ? 'bg-purple-600 text-white shadow-md' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'}`}>
+                      <img src="/kcet_logo.png" alt="" className="w-5 h-5 object-contain" /> KCET
+                    </button>
                   </div>
                 </div>
                 <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl px-6 py-3 rounded-2xl border border-slate-200 dark:border-white/10 shadow-sm dark:shadow-lg dark:shadow-black/20 flex items-center gap-4">
