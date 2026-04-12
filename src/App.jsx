@@ -346,7 +346,7 @@ const ChapterResources = ({ chapter, syllabusMode, videoCache, setVideoCache }) 
         }
         
         // Refined query for better educational results
-        const query = `${chapter} for ${syllabusMode.toUpperCase()} exam one shot preparation lecture and concept review`;
+        const query = `${chapter} ${syllabusMode.toUpperCase()} one shot lecture`;
         
         const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=8&q=${encodeURIComponent(query)}&type=video&videoEmbeddable=true&key=${API_KEY}`);
         const data = await res.json();
