@@ -322,29 +322,56 @@ const PomodoroTimer = ({ children }) => {
 };
 
 // YouTube Resources Component
-const ChapterResources = ({ chapter, syllabusMode }) => {
+const ChapterResources = ({ chapter, syllabusMode, videoCache, setVideoCache }) => {
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (!chapter) return;
+    
+    // Check Cache first
+    const cacheKey = `${syllabusMode}-${chapter}`;
+    if (videoCache[cacheKey]) {
+      setVideos(videoCache[cacheKey]);
+      return;
+    }
+
     const fetchVideos = async () => {
       setLoading(true);
       try {
         const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
-        if (!API_KEY) throw new Error("API Key missing");
-        const query = `${chapter} ${syllabusMode} one shot lecture`;
-        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=6&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}`);
+        if (!API_KEY) {
+           console.warn("YouTube API Key is missing in .env");
+           return;
+        }
+        
+        // Refined query for better educational results
+        const query = `${chapter} for ${syllabusMode.toUpperCase()} exam one shot preparation lecture and concept review`;
+        
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=8&q=${encodeURIComponent(query)}&type=video&videoEmbeddable=true&key=${API_KEY}`);
         const data = await res.json();
-        setVideos(data.items || []);
+        
+        if (data.error) {
+           console.error("YouTube API Error:", data.error.message);
+           setVideos([]);
+           return;
+        }
+        
+        const resultItems = data.items || [];
+        setVideos(resultItems);
+        
+        // Update Cache
+        setVideoCache(prev => ({ ...prev, [cacheKey]: resultItems }));
+
       } catch (err) {
         console.error("Youtube fetch error:", err);
+        setVideos([]);
       } finally {
         setLoading(false);
       }
     };
     fetchVideos();
-  }, [chapter, syllabusMode]);
+  }, [chapter, syllabusMode, videoCache, setVideoCache]);
 
   return (
     <div className="space-y-6">
@@ -1922,9 +1949,10 @@ export default function App() {
   const [isGoalsLoading, setIsGoalsLoading] = useState(true);
   const [highlights, setHighlights] = useState([]);
   const [noteTab, setNoteTab] = useState('My Notes');
-  const [studyChapter, setStudyChapter] = useState('');
+  const [studyChapter, setStudyChapter] = useState(UNIFIED_SYLLABUS['Maths'][0]);
   const [aiStudyPlan, setAiStudyPlan] = useState('');
   const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
+  const [videoCache, setVideoCache] = useState({});
 
   const modeSubjects = useMemo(() => ({
     jee: ['Maths', 'Physics', 'Chemistry'],
@@ -3401,7 +3429,12 @@ export default function App() {
 
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                  <div className="lg:col-span-2">
-                    <ChapterResources chapter={studyChapter || CURRENT_SYLLABUS[activeSubject]?.[0] || 'Physics'} syllabusMode={syllabusMode} />
+                    <ChapterResources 
+                      chapter={studyChapter || CURRENT_SYLLABUS[activeSubject]?.[0] || 'Physics'} 
+                      syllabusMode={syllabusMode} 
+                      videoCache={videoCache}
+                      setVideoCache={setVideoCache}
+                    />
                  </div>
                  
                  <div className="space-y-6">
@@ -3708,7 +3741,7 @@ export default function App() {
           )}
 
 
-          {activeTab !== 'Home' && activeTab !== 'Tests' && activeTab !== 'Resources' && activeTab !== 'Syllabus' && activeTab !== 'Notes' && activeTab !== 'Profile' && activeTab !== 'Community' && activeTab !== 'Goals' && activeTab !== 'Doubts' && activeTab !== 'ChapterPYQs' && (
+          {activeTab !== 'Home' && activeTab !== 'Tests' && activeTab !== 'Resources' && activeTab !== 'Syllabus' && activeTab !== 'Notes' && activeTab !== 'Profile' && activeTab !== 'Community' && activeTab !== 'Goals' && activeTab !== 'Doubts' && activeTab !== 'ChapterPYQs' && activeTab !== 'StudyRoom' && (
             <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-slate-300 dark:border-white/10 rounded-2xl bg-white/50 dark:bg-white/5 backdrop-blur-md">
               <h3 className="text-lg font-bold text-slate-500 dark:text-slate-400 mb-2">{activeTab}</h3>
               <p className="text-sm text-slate-400 dark:text-slate-500 text-center max-w-sm">This section is currently under development.</p>
