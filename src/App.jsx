@@ -225,7 +225,7 @@ const Latex = ({ children, inline = true }) => {
 
 
 // Pomodoro Timer Component for Study Room
-const PomodoroTimer = () => {
+const PomodoroTimer = ({ children }) => {
   const [timeLeft, setTimeLeft] = useState(25 * 60);
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState('Focus');
@@ -261,55 +261,61 @@ const PomodoroTimer = () => {
   const progress = (timeLeft / modes[mode]) * 100;
 
   return (
-    <div className="bg-white/80 dark:bg-[#161923]/80 backdrop-blur-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/10 p-10 shadow-2xl relative overflow-hidden flex flex-col items-center">
+    <div className="bg-white/80 dark:bg-[#161923]/80 backdrop-blur-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/10 p-10 shadow-2xl relative overflow-hidden flex flex-col md:flex-row items-center gap-10">
       <div className={`absolute -top-24 -right-24 w-64 h-64 rounded-full blur-[80px] opacity-10 ${mode === 'Focus' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
       
-      <div className="flex gap-3 mb-10 bg-slate-100 dark:bg-black/30 p-2 rounded-2xl relative z-10">
-        {Object.keys(modes).map(m => (
-          <button 
-            key={m} 
-            onClick={() => toggleMode(m)}
-            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${mode === m ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-400 hover:text-slate-600'}`}
-          >
-            {m}
-          </button>
-        ))}
-      </div>
+      <div className="flex flex-col items-center">
+        <div className="flex gap-3 mb-10 bg-slate-100 dark:bg-black/30 p-2 rounded-2xl relative z-10 w-fit">
+            {Object.keys(modes).map(m => (
+            <button 
+                key={m} 
+                onClick={() => toggleMode(m)}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${mode === m ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-400 hover:text-slate-600'}`}
+            >
+                {m}
+            </button>
+            ))}
+        </div>
 
-      <div className="relative w-64 h-64 mb-10 group">
-        <svg className="w-full h-full transform -rotate-90 text-slate-100 dark:text-white/5">
-          <circle strokeWidth="6" fill="transparent" r="90" cx="128" cy="128" stroke="currentColor" />
-          <circle 
-            className={`${mode === 'Focus' ? 'text-orange-500' : 'text-emerald-500'} stroke-current transition-all duration-300 ease-linear`} 
-            strokeWidth="8" 
-            strokeDasharray={`${2 * Math.PI * 90}`} 
-            strokeDashoffset={`${(2 * Math.PI * 90) * (progress / 100)}`} 
-            strokeLinecap="round" 
-            fill="transparent" 
-            r="90" 
-            cx="128" 
-            cy="128" 
-          />
-        </svg>
-        <div className="absolute inset-0 flex flex-col items-center justify-center">
-          <span className="text-6xl font-black text-slate-900 dark:text-white tracking-tighter transition-all group-hover:scale-110">{formatTime(timeLeft)}</span>
-          <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-2">{isActive ? 'Session Active' : 'Ready?'}</span>
+        <div className="relative w-64 h-64 mb-10 group">
+            <svg className="w-full h-full transform -rotate-90 text-slate-100 dark:text-white/5">
+            <circle strokeWidth="6" fill="transparent" r="90" cx="128" cy="128" stroke="currentColor" />
+            <circle 
+                className={`${mode === 'Focus' ? 'text-orange-500' : 'text-emerald-500'} stroke-current transition-all duration-300 ease-linear`} 
+                strokeWidth="8" 
+                strokeDasharray={`${2 * Math.PI * 90}`} 
+                strokeDashoffset={`${(2 * Math.PI * 90) * (progress / 100)}`} 
+                strokeLinecap="round" 
+                fill="transparent" 
+                r="90" 
+                cx="128" 
+                cy="128" 
+            />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-6xl font-black text-slate-900 dark:text-white tracking-tighter transition-all group-hover:scale-110">{formatTime(timeLeft)}</span>
+            <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-2">{isActive ? 'Session Active' : 'Ready?'}</span>
+            </div>
+        </div>
+
+        <div className="flex gap-4 relative z-10">
+            <button 
+            onClick={() => setIsActive(!isActive)}
+            className={`px-12 py-4 rounded-2xl font-black text-sm tracking-widest uppercase transition-all shadow-xl ${isActive ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-105 active:scale-95' : 'bg-orange-600 text-white hover:bg-orange-700 hover:scale-105 active:scale-95 shadow-orange-500/20'}`}
+            >
+            {isActive ? 'Pause' : 'Start Focus'}
+            </button>
+            <button 
+            onClick={() => { setIsActive(false); setTimeLeft(modes[mode]); }}
+            className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all hover:rotate-45"
+            >
+            <RotateCcw size={20} />
+            </button>
         </div>
       </div>
 
-      <div className="flex gap-4 relative z-10">
-        <button 
-          onClick={() => setIsActive(!isActive)}
-          className={`px-12 py-4 rounded-2xl font-black text-sm tracking-widest uppercase transition-all shadow-xl ${isActive ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-105 active:scale-95' : 'bg-orange-600 text-white hover:bg-orange-700 hover:scale-105 active:scale-95 shadow-orange-500/20'}`}
-        >
-          {isActive ? 'Pause' : 'Start Focus'}
-        </button>
-        <button 
-          onClick={() => { setIsActive(false); setTimeLeft(modes[mode]); }}
-          className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all hover:rotate-45"
-        >
-          <RotateCcw size={20} />
-        </button>
+      <div className="flex-1 flex flex-col gap-6 w-full md:w-auto h-full justify-center">
+         {children}
       </div>
     </div>
   );
@@ -1916,6 +1922,9 @@ export default function App() {
   const [isGoalsLoading, setIsGoalsLoading] = useState(true);
   const [highlights, setHighlights] = useState([]);
   const [noteTab, setNoteTab] = useState('My Notes');
+  const [studyChapter, setStudyChapter] = useState('');
+  const [aiStudyPlan, setAiStudyPlan] = useState('');
+  const [isGeneratingPlan, setIsGeneratingPlan] = useState(false);
 
   const modeSubjects = useMemo(() => ({
     jee: ['Maths', 'Physics', 'Chemistry'],
@@ -3338,31 +3347,99 @@ export default function App() {
       )}
 
           {activeTab === 'StudyRoom' && (
-            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 flex flex-col lg:flex-row gap-8">
-              <div className="lg:w-1/3 flex flex-col gap-6">
-                 <PomodoroTimer />
-                 
-                 <div className="bg-white/80 dark:bg-white/5 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-8">
-                    <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-4">Select Focus Subject</h4>
-                    <div className="space-y-2 max-h-[400px] overflow-y-auto no-scrollbar">
-                      {modeSubjects[syllabusMode]?.map(sub => (
-                        <button 
-                          key={sub} 
-                          onClick={() => setActiveSubject(sub)}
-                          className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${
-                            activeSubject === sub 
-                            ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5 dark:text-slate-400'
-                          }`}
+            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 space-y-8">
+              <PomodoroTimer>
+                <div className="flex flex-col gap-6">
+                   <div className="space-y-4">
+                      <div>
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Focus Subject</h4>
+                        <div className="flex gap-2">
+                           {modeSubjects[syllabusMode]?.map(sub => (
+                             <button 
+                               key={sub} 
+                               onClick={() => { setActiveSubject(sub); setStudyChapter(UNIFIED_SYLLABUS[sub][0]); }}
+                               className={`px-5 py-3 rounded-2xl text-xs font-bold transition-all border ${activeSubject === sub ? 'bg-blue-600 text-white border-blue-500 shadow-lg shadow-blue-500/20' : 'bg-white dark:bg-white/5 text-slate-500 border-slate-200 dark:border-white/10'}`}
+                             >
+                               {sub}
+                             </button>
+                           ))}
+                        </div>
+                      </div>
+
+                      <div className="relative">
+                        <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 px-1">Select Chapter</h4>
+                        <select 
+                           value={studyChapter || (CURRENT_SYLLABUS[activeSubject]?.[0] || '')}
+                           onChange={(e) => setStudyChapter(e.target.value)}
+                           className="w-full bg-white dark:bg-[#161923] border border-slate-200 dark:border-white/10 rounded-2xl py-4 px-6 outline-none focus:border-blue-500 transition-all text-sm font-bold text-slate-800 dark:text-white appearance-none cursor-pointer"
                         >
-                          {sub}
-                        </button>
-                      ))}
+                           {UNIFIED_SYLLABUS[activeSubject]?.map(chap => (
+                             <option key={chap} value={chap}>{chap}</option>
+                           ))}
+                        </select>
+                        <ChevronDown size={18} className="absolute right-6 bottom-4 text-slate-400 pointer-events-none" />
+                      </div>
+                   </div>
+
+                   <button 
+                      onClick={async () => {
+                         setIsGeneratingPlan(true);
+                         // This is a placeholder for the actual AI API call logic
+                         // We simulate the call to create a premium "vibe"
+                         setTimeout(() => {
+                            setAiStudyPlan(`Deep Focus Session for ${studyChapter || 'this chapter'}:\n1. Master 3 Core Concepts\n2. Solve 15 High-Yield PYQs\n3. Rapid Active Recall`);
+                            setIsGeneratingPlan(false);
+                         }, 1500);
+                      }}
+                      className="w-full flex items-center justify-center gap-3 px-8 py-5 rounded-2xl bg-gradient-to-br from-violet-600 to-blue-600 text-white font-black text-xs uppercase tracking-widest shadow-2xl hover:scale-[1.02] active:scale-95 transition-all group"
+                   >
+                      {isGeneratingPlan ? <RotateCcw size={18} className="animate-spin" /> : <Sparkles size={18} className="group-hover:animate-pulse" />}
+                      Generate AI Study Plan
+                   </button>
+                </div>
+              </PomodoroTimer>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                 <div className="lg:col-span-2">
+                    <ChapterResources chapter={studyChapter || CURRENT_SYLLABUS[activeSubject]?.[0] || 'Physics'} syllabusMode={syllabusMode} />
+                 </div>
+                 
+                 <div className="space-y-6">
+                    <div className="bg-white/80 dark:bg-white/5 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-8 min-h-[300px] relative overflow-hidden group">
+                       <div className="absolute top-0 right-0 p-6 opacity-10 group-hover:opacity-20 transition-opacity"><Sparkles size={64} className="text-violet-500" /></div>
+                       <h3 className="font-black text-sm text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-3 mb-6">
+                          <Zap size={18} className="text-amber-500" /> AI Insights
+                       </h3>
+                       
+                       {aiStudyPlan ? (
+                          <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                             {aiStudyPlan.split('\n').map((line, i) => (
+                                <div key={i} className="flex gap-3">
+                                   <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1.5 shrink-0" />
+                                   <p className="text-xs font-bold text-slate-600 dark:text-slate-300 leading-relaxed">{line}</p>
+                                </div>
+                             ))}
+                             <div className="mt-8 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                                <p className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest text-center">AI Plan Active</p>
+                             </div>
+                          </div>
+                       ) : (
+                          <div className="flex flex-col items-center justify-center h-full py-10 text-center">
+                             <div className="w-12 h-12 rounded-2xl bg-slate-50 dark:bg-white/5 flex items-center justify-center mb-4"><Search size={24} className="text-slate-300" /></div>
+                             <p className="text-xs font-bold text-slate-400">Click generate to get your AI study roadmap.</p>
+                          </div>
+                       )}
+                    </div>
+
+                    <div className="bg-gradient-to-br from-slate-900 to-indigo-950 rounded-[2.5rem] p-8 text-white relative overflow-hidden">
+                        <div className="relative z-10">
+                           <h4 className="font-black text-xs uppercase tracking-[0.2em] opacity-60 mb-2">Deep Work Streak</h4>
+                           <div className="text-4xl font-black mb-4">4.2 <span className="text-sm opacity-60">Hours</span></div>
+                           <p className="text-[10px] font-bold text-indigo-300 uppercase tracking-widest">Keep going for a 15 min break</p>
+                        </div>
+                        <div className="absolute -bottom-6 -right-6 w-32 h-32 bg-white/5 rounded-full blur-3xl"></div>
                     </div>
                  </div>
-              </div>
-              
-              <div className="flex-1">
-                 <ChapterResources chapter={CURRENT_SYLLABUS[activeSubject]?.[0] || 'Physics'} syllabusMode={syllabusMode} />
               </div>
             </div>
           )}
