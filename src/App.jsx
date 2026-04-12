@@ -67,7 +67,12 @@ import {
   Send,
   RotateCcw,
   ThumbsDown,
-  AlertTriangle
+  AlertTriangle,
+  Coffee,
+  Play,
+  PlayCircle,
+  Tv,
+  MonitorPlay
 } from 'lucide-react';
 import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
 import { PolicyAcceptanceModal } from './Policies';
@@ -219,7 +224,173 @@ const Latex = ({ children, inline = true }) => {
 };
 
 
-// Custom PDF Viewer using react-pdf-highlighter for pro-level annotation
+// Pomodoro Timer Component for Study Room
+const PomodoroTimer = () => {
+  const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [isActive, setIsActive] = useState(false);
+  const [mode, setMode] = useState('Focus');
+
+  const modes = {
+    Focus: 25 * 60,
+    Short: 5 * 60,
+    Long: 15 * 60
+  };
+
+  useEffect(() => {
+    let interval = null;
+    if (isActive && timeLeft > 0) {
+      interval = setInterval(() => setTimeLeft(prev => prev - 1), 1000);
+    } else if (timeLeft === 0) {
+      setIsActive(false);
+    }
+    return () => clearInterval(interval);
+  }, [isActive, timeLeft]);
+
+  const toggleMode = (newMode) => {
+    setMode(newMode);
+    setTimeLeft(modes[newMode]);
+    setIsActive(false);
+  };
+
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  const progress = (timeLeft / modes[mode]) * 100;
+
+  return (
+    <div className="bg-white/80 dark:bg-[#161923]/80 backdrop-blur-2xl rounded-[2.5rem] border border-slate-200 dark:border-white/10 p-10 shadow-2xl relative overflow-hidden flex flex-col items-center">
+      <div className={`absolute -top-24 -right-24 w-64 h-64 rounded-full blur-[80px] opacity-10 ${mode === 'Focus' ? 'bg-orange-500' : 'bg-emerald-500'}`}></div>
+      
+      <div className="flex gap-3 mb-10 bg-slate-100 dark:bg-black/30 p-2 rounded-2xl relative z-10">
+        {Object.keys(modes).map(m => (
+          <button 
+            key={m} 
+            onClick={() => toggleMode(m)}
+            className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${mode === m ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm ring-1 ring-slate-200 dark:ring-white/10' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            {m}
+          </button>
+        ))}
+      </div>
+
+      <div className="relative w-64 h-64 mb-10 group">
+        <svg className="w-full h-full transform -rotate-90 text-slate-100 dark:text-white/5">
+          <circle strokeWidth="6" fill="transparent" r="90" cx="128" cy="128" stroke="currentColor" />
+          <circle 
+            className={`${mode === 'Focus' ? 'text-orange-500' : 'text-emerald-500'} stroke-current transition-all duration-300 ease-linear`} 
+            strokeWidth="8" 
+            strokeDasharray={`${2 * Math.PI * 90}`} 
+            strokeDashoffset={`${(2 * Math.PI * 90) * (progress / 100)}`} 
+            strokeLinecap="round" 
+            fill="transparent" 
+            r="90" 
+            cx="128" 
+            cy="128" 
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className="text-6xl font-black text-slate-900 dark:text-white tracking-tighter transition-all group-hover:scale-110">{formatTime(timeLeft)}</span>
+          <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.3em] mt-2">{isActive ? 'Session Active' : 'Ready?'}</span>
+        </div>
+      </div>
+
+      <div className="flex gap-4 relative z-10">
+        <button 
+          onClick={() => setIsActive(!isActive)}
+          className={`px-12 py-4 rounded-2xl font-black text-sm tracking-widest uppercase transition-all shadow-xl ${isActive ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 hover:scale-105 active:scale-95' : 'bg-orange-600 text-white hover:bg-orange-700 hover:scale-105 active:scale-95 shadow-orange-500/20'}`}
+        >
+          {isActive ? 'Pause' : 'Start Focus'}
+        </button>
+        <button 
+          onClick={() => { setIsActive(false); setTimeLeft(modes[mode]); }}
+          className="w-14 h-14 rounded-2xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center text-slate-500 hover:text-slate-900 dark:hover:text-white transition-all hover:rotate-45"
+        >
+          <RotateCcw size={20} />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+// YouTube Resources Component
+const ChapterResources = ({ chapter, syllabusMode }) => {
+  const [videos, setVideos] = useState([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!chapter) return;
+    const fetchVideos = async () => {
+      setLoading(true);
+      try {
+        const API_KEY = import.meta.env.VITE_YOUTUBE_API_KEY;
+        if (!API_KEY) throw new Error("API Key missing");
+        const query = `${chapter} ${syllabusMode} one shot lecture`;
+        const res = await fetch(`https://www.googleapis.com/youtube/v3/search?part=snippet&maxResults=6&q=${encodeURIComponent(query)}&type=video&key=${API_KEY}`);
+        const data = await res.json();
+        setVideos(data.items || []);
+      } catch (err) {
+        console.error("Youtube fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchVideos();
+  }, [chapter, syllabusMode]);
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight flex items-center gap-3">
+            <MonitorPlay size={24} className="text-rose-500" /> Lectures for {chapter}
+          </h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">Curated One-Shots for rapid chapter coverage.</p>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 animate-pulse">
+          {[1,2,3,4].map(n => <div key={n} className="h-48 bg-slate-100 dark:bg-white/5 rounded-3xl" />)}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pb-20">
+          {videos.map(v => (
+            <a 
+              key={v.id.videoId} 
+              href={`https://youtube.com/watch?v=${v.id.videoId}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="group bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5 rounded-3xl overflow-hidden hover:border-rose-500/50 transition-all hover:shadow-xl dark:hover:shadow-rose-900/10"
+            >
+              <div className="aspect-video relative overflow-hidden">
+                <img src={v.snippet.thumbnails.high.url} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" alt={v.snippet.title} />
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                  <PlayCircle size={48} className="text-white drop-shadow-2xl" />
+                </div>
+              </div>
+              <div className="p-5">
+                <h4 className="font-bold text-sm text-slate-900 dark:text-white line-clamp-2 leading-snug group-hover:text-rose-500 transition-colors" dangerouslySetInnerHTML={{ __html: v.snippet.title }} />
+                <div className="flex items-center gap-2 mt-3 text-[10px] font-black text-slate-500 bg-slate-100 dark:bg-white/5 w-fit px-2 py-1 rounded-md">
+                   {v.snippet.channelTitle}
+                </div>
+              </div>
+            </a>
+          ))}
+          {videos.length === 0 && !loading && (
+             <div className="col-span-full py-10 text-center text-slate-500">
+                <p>No videos found. Check your API key or search query.</p>
+             </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Custom PDF Viewer
 const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
   const [isLoading, setIsLoading] = React.useState(true);
 
@@ -2909,6 +3080,7 @@ export default function App() {
             <SidebarItem icon={<BookOpen size={20} />} label="Notes" active={activeTab === 'Notes'} onClick={() => setActiveTab('Notes')} />
             <SidebarItem icon={<Layers size={20} />} label={<span className="flex items-center gap-2">Resources <Sparkles size={14} className="text-amber-500 dark:text-amber-400 fill-amber-500 dark:fill-amber-400 animate-pulse" /></span>} active={activeTab === 'Resources'} onClick={() => setActiveTab('Resources')} />
             <SidebarItem icon={<ListChecks size={20} />} label="Syllabus" active={activeTab === 'Syllabus'} onClick={() => setActiveTab('Syllabus')} />
+            <SidebarItem icon={<MonitorPlay size={20} />} label="Study Room" active={activeTab === 'StudyRoom'} onClick={() => setActiveTab('StudyRoom')} />
             <SidebarItem icon={<Users size={20} />} label="Community" active={activeTab === 'Community'} onClick={() => setActiveTab('Community')} />
           </nav>
           <div className="p-4 space-y-2 border-t border-slate-200 dark:border-white/5">
@@ -2936,7 +3108,10 @@ export default function App() {
           <header className="flex items-center justify-between mb-8">
             <div className="flex flex-col">
               <span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Dashboard</span>
-              <h2 className="text-2xl font-black text-slate-900 dark:text-white">{activeTab === 'ChapterPYQs' ? 'PYQ Library' : activeTab}</h2>
+              <h2 className="text-2xl font-black text-slate-900 dark:text-white">
+                {activeTab === 'ChapterPYQs' ? 'PYQ Library' : 
+                 activeTab === 'StudyRoom' ? 'Deep Work Room' : activeTab}
+              </h2>
             </div>
             <div className="flex items-center gap-4">
               <button className="w-10 h-10 rounded-full flex items-center justify-center bg-white/80 dark:bg-white/5 backdrop-blur-md border border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 hover:border-blue-400 dark:hover:border-blue-500/30 transition-all shadow-sm"><Bell size={20} /></button>
@@ -3161,6 +3336,36 @@ export default function App() {
               </div>
         </div>
       )}
+
+          {activeTab === 'StudyRoom' && (
+            <div className="animate-in fade-in slide-in-from-bottom-8 duration-700 flex flex-col lg:flex-row gap-8">
+              <div className="lg:w-1/3 flex flex-col gap-6">
+                 <PomodoroTimer />
+                 
+                 <div className="bg-white/80 dark:bg-white/5 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-8">
+                    <h4 className="font-black text-[10px] text-slate-400 uppercase tracking-widest mb-4">Select Focus Subject</h4>
+                    <div className="space-y-2 max-h-[400px] overflow-y-auto no-scrollbar">
+                      {modeSubjects[syllabusMode]?.map(sub => (
+                        <button 
+                          key={sub} 
+                          onClick={() => setActiveSubject(sub)}
+                          className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${
+                            activeSubject === sub 
+                            ? 'bg-blue-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-50 dark:hover:bg-white/5 dark:text-slate-400'
+                          }`}
+                        >
+                          {sub}
+                        </button>
+                      ))}
+                    </div>
+                 </div>
+              </div>
+              
+              <div className="flex-1">
+                 <ChapterResources chapter={CURRENT_SYLLABUS[activeSubject]?.[0] || 'Physics'} syllabusMode={syllabusMode} />
+              </div>
+            </div>
+          )}
 
           {activeTab === 'Tests' && (
             <div className="max-w-4xl mx-auto mt-4 animate-in fade-in duration-500 flex flex-col items-center">
