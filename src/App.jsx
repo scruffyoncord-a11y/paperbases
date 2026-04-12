@@ -60,14 +60,11 @@ import {
   Trash2,
   ExternalLink,
   Highlighter,
-  Terminal,
-  Wand2,
   Image as ImageIcon,
   ZoomIn,
   ZoomOut,
   ChevronLeft,
   Send,
-  Bot,
   RotateCcw,
   ThumbsDown,
   AlertTriangle
@@ -151,17 +148,6 @@ const getSubjectColor = (subject) => {
   }
 };
 
-// LaTeX snippets for the playground
-const SNIPPETS = [
-  { label: "Quadratic", val: "\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}" },
-  { label: "Integral", val: "\\int_{-\\infty}^{\\infty} e^{-x^2} dx = \\sqrt{\\pi}" },
-  { label: "Matrix", val: "\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}" },
-  { label: "Sum", val: "\\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}" },
-  { label: "Euler", val: "e^{i\\pi} + 1 = 0" },
-  { label: "Binomial", val: "\\binom{n}{k} = \\frac{n!}{k!(n-k)!}" },
-  { label: "Limit", val: "\\lim_{x \\to 0} \\frac{\\sin x}{x} = 1" },
-  { label: "Maxwell", val: "\\nabla \\cdot \\mathbf{E} = \\frac{\\rho}{\\varepsilon_0}" },
-];
 
 // Custom hook for reliable MathJax loading & configuration
 function useMathJax() {
@@ -232,108 +218,6 @@ const Latex = ({ children, inline = true }) => {
   );
 };
 
-// Interactive LaTeX Playground Component
-const LatexPlayground = () => {
-  const [input, setInput] = React.useState("e^{i\\pi} + 1 = 0");
-  const [mode, setMode] = React.useState("block");
-  const previewRef = React.useRef(null);
-  const debounceRef = React.useRef(null);
-  const mjReady = useMathJax();
-
-  const renderMath = React.useCallback(() => {
-    if (!previewRef.current || !window.MathJax?.typesetPromise) return;
-    const wrapped = mode === "block" ? `\\[${input}\\]` : `\\(${input}\\)`;
-    previewRef.current.innerHTML = wrapped;
-    window.MathJax.typesetPromise([previewRef.current]).catch(err => console.error("Playground error:", err));
-  }, [input, mode]);
-
-  React.useEffect(() => {
-    if (!mjReady) return;
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(renderMath, 180);
-    return () => clearTimeout(debounceRef.current);
-  }, [input, mode, mjReady, renderMath]);
-
-  return (
-    <div className="animate-in fade-in zoom-in duration-500">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-            <div>
-                <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2">Math Tools</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">Draft complex equations with live preview and snippets.</p>
-            </div>
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="space-y-6">
-                <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-8 shadow-xl">
-                    <div className="flex items-center gap-3 mb-6">
-                        <div className="w-10 h-10 bg-blue-500/10 rounded-2xl flex items-center justify-center">
-                            <Terminal size={20} className="text-blue-500" />
-                        </div>
-                        <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">LaTeX Input</h3>
-                    </div>
-                    
-                    <textarea
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Type LaTeX here..."
-                        className="w-full h-48 bg-slate-50 dark:bg-[#0B0E14] text-slate-900 dark:text-slate-100 p-6 rounded-3xl border border-slate-200 dark:border-white/5 outline-none focus:border-blue-500/50 transition-all font-mono text-sm leading-relaxed"
-                    />
-
-                    <div className="flex flex-wrap gap-2 mt-6">
-                        {SNIPPETS.map((s) => (
-                            <button 
-                                key={s.label} 
-                                onClick={() => setInput(s.val)}
-                                className="px-3 py-1.5 bg-white dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-blue-500 hover:border-blue-500/30 transition-all"
-                            >
-                                {s.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                <div className="flex items-center gap-4 bg-white/50 dark:bg-white/5 p-4 rounded-3xl border border-slate-100 dark:border-white/5">
-                    <span className="text-xs font-black text-slate-400 uppercase ml-2">Display Mode:</span>
-                    <button 
-                        onClick={() => setMode('block')}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mode === 'block' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-400'}`}
-                    >
-                        Block
-                    </button>
-                    <button 
-                        onClick={() => setMode('inline')}
-                        className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${mode === 'inline' ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900' : 'text-slate-400'}`}
-                    >
-                        Inline
-                    </button>
-                </div>
-            </div>
-
-            <div className="bg-white dark:bg-[#161923] border border-blue-500/20 rounded-[2.5rem] p-10 shadow-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-                    <Wand2 size={120} className="text-blue-500" />
-                </div>
-                
-                <div className="flex items-center gap-3 mb-8">
-                    <div className="w-10 h-10 bg-emerald-500/10 rounded-2xl flex items-center justify-center">
-                        <Sparkles size={20} className="text-emerald-500" />
-                    </div>
-                    <h3 className="font-black text-slate-900 dark:text-white uppercase tracking-widest text-sm">Preview</h3>
-                </div>
-
-                <div className="min-h-[200px] flex items-center justify-center text-center">
-                    {!input.trim() ? (
-                        <p className="text-slate-400 italic">Rendered equation will appear here...</p>
-                    ) : (
-                        <div ref={previewRef} className="text-2xl text-slate-800 dark:text-slate-100" />
-                    )}
-                </div>
-            </div>
-        </div>
-    </div>
-  );
-};
 
 // Custom PDF Viewer using react-pdf-highlighter for pro-level annotation
 const PdfViewer = React.memo(({ url, title, highlights = [], onHighlight }) => {
@@ -754,7 +638,7 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                 }`}
               >
                 <div className={`absolute inset-0 bg-violet-500/10 opacity-0 group-hover:opacity-100 transition-opacity ${sidebarTab === 'chat' ? 'opacity-100' : ''}`} />
-                <Bot size={14} className={sidebarTab === 'chat' ? 'animate-bounce' : ''} />
+                <img src="/paper_ai_logo.png" className={`w-5 h-5 object-contain ${sidebarTab === 'chat' ? 'animate-bounce' : ''}`} alt="PaperAI Logo" />
                 <span className="relative z-10">PaperAI</span>
                 {sidebarTab === 'chat' && <div className="absolute bottom-0 inset-x-6 h-[2px] bg-gradient-to-r from-violet-500 to-blue-500 rounded-full shadow-[0_0_10px_rgba(139,92,246,0.5)]" />}
               </button>
@@ -791,8 +675,8 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                 {/* Chat Header */}
                 <div className="px-5 py-4 border-b border-slate-100 dark:border-white/5 flex items-center justify-between bg-white/20 dark:bg-white/[0.01]">
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shadow-xl shadow-violet-500/30">
-                      <Bot size={18} className="text-white" />
+                    <div className="w-10 h-10 rounded-2xl bg-white dark:bg-white/5 flex items-center justify-center shadow-xl border border-slate-200 dark:border-white/10 overflow-hidden">
+                      <img src="/paper_ai_logo.png" className="w-7 h-7 object-contain" alt="PaperAI" />
                     </div>
                     <div>
                       <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider leading-none">PaperAI Assistant</h4>
@@ -815,9 +699,9 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                 <div className="flex-1 overflow-y-auto p-4 space-y-4 no-scrollbar">
                   {chatMessages.length === 0 && !isChatLoading && (
                     <div className="flex flex-col items-center justify-center py-16 px-8 text-center bg-violet-500/[0.01] rounded-[3rem] m-2 border border-violet-500/5">
-                      <div className="w-24 h-24 rounded-[2.5rem] bg-gradient-to-br from-violet-500/20 to-blue-500/20 border border-violet-500/10 flex items-center justify-center mb-6 shadow-2xl relative group">
-                        <div className="absolute inset-0 bg-violet-500/20 blur-2xl rounded-full opacity-30 group-hover:opacity-50 transition-opacity" />
-                        <Bot size={44} className="text-violet-500 relative z-10" />
+                      <div className="w-24 h-24 rounded-[2.5rem] bg-white dark:bg-white/5 border border-slate-200 dark:border-white/10 flex items-center justify-center mb-6 shadow-2xl relative group overflow-hidden">
+                        <div className="absolute inset-0 bg-violet-500/5 blur-2xl rounded-full opacity-30 group-hover:opacity-50 transition-opacity" />
+                        <img src="/paper_ai_logo.png" className="w-16 h-16 object-contain relative z-10" alt="PaperAI Logo" />
                       </div>
                       <h4 className="text-base font-black text-slate-900 dark:text-white mb-3 tracking-tight">Meet PaperAI ✨</h4>
                       <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed mb-8 max-w-[280px]">
@@ -851,8 +735,8 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                       style={{ animationDelay: `${idx * 40}ms` }}
                     >
                       {msg.role === 'assistant' && (
-                        <div className="w-8 h-8 rounded-2xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shrink-0 mt-1 shadow-xl shadow-violet-500/20 border border-white/10">
-                          <Bot size={16} className="text-white" />
+                        <div className="w-8 h-8 rounded-2xl bg-white dark:bg-white/5 flex items-center justify-center shrink-0 mt-1 shadow-md border border-slate-200 dark:border-white/10 overflow-hidden">
+                          <img src="/paper_ai_logo.png" className="w-6 h-6 object-contain" alt="PaperAI" />
                         </div>
                       )}
                       <div
@@ -880,8 +764,8 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                   {/* Typing Indicator */}
                   {isChatLoading && (
                     <div className="flex gap-2.5 items-start animate-in fade-in duration-300">
-                      <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-500 to-blue-600 flex items-center justify-center shrink-0 shadow-lg shadow-violet-500/20">
-                        <Bot size={14} className="text-white" />
+                      <div className="w-7 h-7 rounded-xl bg-white dark:bg-white/5 flex items-center justify-center shrink-0 shadow-lg border border-slate-200 dark:border-white/10 overflow-hidden">
+                        <img src="/paper_ai_logo.png" className="w-5 h-5 object-contain" alt="PaperAI" />
                       </div>
                       <div className="bg-slate-100 dark:bg-white/[0.06] rounded-2xl rounded-bl-md px-5 py-4 border border-slate-200 dark:border-white/5">
                         <div className="flex gap-1.5">
@@ -1004,7 +888,7 @@ function ResourceViewerModal({ resource: initialResource, user, onClose, onLike 
                 
                 <div className="p-5 bg-white dark:bg-black/20 border-t border-slate-100 dark:border-white/5">
                     <div className="flex items-start gap-3 bg-violet-500/10 p-3 rounded-xl border border-violet-500/10">
-                        <Bot size={16} className="text-violet-500 shrink-0 mt-0.5" />
+                        <img src="/paper_ai_logo.png" className="w-5 h-5 object-contain shrink-0 mt-0.5" alt="PaperAI" />
                         <div>
                             <p className="text-[10px] text-violet-600 dark:text-violet-400 font-bold leading-normal uppercase tracking-wider mb-1">PaperAI Enabled</p>
                             <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium leading-relaxed">Your highlights are automatically used as context for AI conversations.</p>
@@ -1694,7 +1578,7 @@ const ResourcesView = ({
                         onClick={() => setActiveTab('PaperAI')}
                         className="flex items-center gap-3 px-8 py-4 rounded-[2.5rem] bg-gradient-to-br from-violet-600 to-blue-600 text-white font-black text-[13px] uppercase tracking-widest shadow-2xl hover:scale-105 active:scale-95 transition-all ml-4"
                     >
-                        <Bot size={18} />
+                        <img src="/paper_ai_logo.png" className="w-5 h-5 object-contain" alt="PaperAI Logo" />
                         Ask PaperAI instead
                     </button>
                 </div>
@@ -2392,13 +2276,13 @@ export default function App() {
   const toggleTheme = () => setIsDarkMode(!isDarkMode);
 
   const exams = [
-    { id: 'jee', name: 'JEE', color: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-500/20', img: 'https://i.postimg.cc/LXfc8LVS/image.png' },
-    { id: 'neet', name: 'NEET', color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-500/20', img: 'https://i.postimg.cc/LXfc8LVS/image.png' },
+    { id: 'jee', name: 'JEE', color: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-500/20', img: '/cbse_logo.png' },
+    { id: 'neet', name: 'NEET', color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-500/20', img: '/cbse_logo.png' },
     { id: 'bitsat', name: 'BITSAT', color: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-500/20', img: 'https://i.postimg.cc/hvR8rBn1/image.png' },
     { id: 'viteee', name: 'VITEEE', color: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400', border: 'border-indigo-200 dark:border-indigo-500/20', img: 'https://i.postimg.cc/xC5LVFb5/image.png' },
     { id: 'kcet', name: 'KCET', color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-500/20', img: 'https://i.postimg.cc/hGPS3yg2/image.png' },
     { id: 'comedk', name: 'COMEDK', color: 'bg-slate-50 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400', border: 'border-slate-200 dark:border-slate-500/20', img: 'https://i.postimg.cc/ry59QQm6/Untitled.png' },
-    { id: 'cuet', name: 'CUET', color: 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400', border: 'border-sky-200 dark:border-sky-500/20', img: 'https://i.postimg.cc/LXfc8LVS/image.png' },
+    { id: 'cuet', name: 'CUET', color: 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400', border: 'border-sky-200 dark:border-sky-500/20', img: '/cbse_logo.png' },
     { id: 'keam', name: 'KEAM', color: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400', border: 'border-rose-200 dark:border-rose-500/20', img: 'https://i.postimg.cc/BQ4Hn3Cn/image.png' },
   ];
 
@@ -2427,9 +2311,9 @@ export default function App() {
 
   const examTemplates = [
     { id: 'custom', name: 'Auto-detect', desc: 'From JSON structure', icon: <FileText className="text-slate-400" size={40} /> },
-    { id: 'jee', name: 'JEE Main', desc: '75 Qs · MCQ + Numerical', icon: <img src="https://i.postimg.cc/LXfc8LVS/image.png" alt="JEE" className="w-12 h-12 object-contain drop-shadow-sm" /> },
+    { id: 'jee', name: 'JEE Main', desc: '75 Qs · MCQ + Numerical', icon: <img src="/cbse_logo.png" alt="JEE" className="w-12 h-12 object-contain drop-shadow-sm" /> },
     { id: 'bitsat', name: 'BITSAT', desc: '150 Qs · MCQ only', icon: <img src="https://i.postimg.cc/hvR8rBn1/image.png" alt="BITSAT" className="w-12 h-12 object-contain drop-shadow-sm" /> },
-    { id: 'neet', name: 'NEET', desc: '200 Qs · MCQ only', icon: <img src="https://i.postimg.cc/LXfc8LVS/image.png" alt="NEET" className="w-12 h-12 object-contain drop-shadow-sm" /> },
+    { id: 'neet', name: 'NEET', desc: '200 Qs · MCQ only', icon: <img src="/cbse_logo.png" alt="NEET" className="w-12 h-12 object-contain drop-shadow-sm" /> },
     { id: 'comedk', name: 'COMEDK', desc: '180 Qs · No Negative', icon: <img src="https://i.postimg.cc/ry59QQm6/Untitled.png" alt="COMEDK" className="w-12 h-12 object-contain drop-shadow-sm" /> },
     { id: 'kcet', name: 'KCET', desc: '180 Qs · No Negative', icon: <img src="https://i.postimg.cc/hGPS3yg2/image.png" alt="KCET" className="w-12 h-12 object-contain drop-shadow-sm" /> },
     { id: 'viteee', name: 'VITEEE', desc: '125 Qs · No Negative', icon: <img src="https://i.postimg.cc/xC5LVFb5/image.png" alt="VITEEE" className="w-12 h-12 object-contain drop-shadow-sm" /> },
@@ -3026,7 +2910,6 @@ export default function App() {
             <SidebarItem icon={<Layers size={20} />} label={<span className="flex items-center gap-2">Resources <Sparkles size={14} className="text-amber-500 dark:text-amber-400 fill-amber-500 dark:fill-amber-400 animate-pulse" /></span>} active={activeTab === 'Resources'} onClick={() => setActiveTab('Resources')} />
             <SidebarItem icon={<ListChecks size={20} />} label="Syllabus" active={activeTab === 'Syllabus'} onClick={() => setActiveTab('Syllabus')} />
             <SidebarItem icon={<Users size={20} />} label="Community" active={activeTab === 'Community'} onClick={() => setActiveTab('Community')} />
-            <SidebarItem icon={<Wand2 size={20} />} label="Playground" active={activeTab === 'Playground'} onClick={() => setActiveTab('Playground')} />
           </nav>
           <div className="p-4 space-y-2 border-t border-slate-200 dark:border-white/5">
             <div onClick={toggleTheme} className="flex items-center gap-3 px-4 py-3 text-sm text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-white/5 rounded-xl cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-white/10 select-none">
@@ -3068,7 +2951,6 @@ export default function App() {
             </div>
           </header>
 
-          {activeTab === 'Playground' && <LatexPlayground />}
           
           {activeTab === 'Home' && (
             <div className="animate-in fade-in slide-in-from-top-4 duration-700 mb-10 pb-10 border-b border-slate-200 dark:border-white/10">
