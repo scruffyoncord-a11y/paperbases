@@ -3077,36 +3077,7 @@ export default function App() {
       </div>
     </section>
   );
-          <div className="bg-slate-800 dark:bg-[#2d323c]/70 backdrop-blur-xl border border-slate-700 dark:border-[#444b55] rounded-3xl p-6 text-white shadow-xl">
-            <h3 className="text-lg font-black mb-4 flex items-center gap-2 text-white"><Trophy size={20} className="text-amber-400" /> Hall of Fame</h3>
-            <div className="space-y-4">
-              {[{ name: "Aditya Verma", score: "2,450 pts", rank: 1, color: "text-amber-400" }, { name: "Sarah Khan", score: "2,120 pts", rank: 2, color: "text-slate-300" }, { name: "Ishaan P.", score: "1,980 pts", rank: 3, color: "text-amber-700" }].map((user, i) => (
-                <div key={i} className="flex items-center justify-between group">
-                  <div className="flex items-center gap-3">
-                    <span className={`font-black text-sm ${user.color}`}>#{user.rank}</span>
-                    <span className="text-sm font-bold text-slate-200 group-hover:text-blue-400 transition-colors">{user.name}</span>
-                  </div>
-                  <span className="text-xs font-bold text-slate-400">{user.score}</span>
-                </div>
-              ))}
-            </div>
-            <button className="w-full mt-6 py-2.5 bg-slate-900/50 dark:bg-[#15181e]/80 border border-slate-700 dark:border-[#333942] hover:border-slate-600 rounded-xl text-xs font-bold transition-all text-slate-300">View All Rankings</button>
-          </div>
-          <div className="bg-white/80 dark:bg-[#22262e]/70 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-3xl p-6 shadow-sm dark:shadow-lg dark:shadow-black/20">
-            <h3 className="font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2"><Zap size={18} className="text-blue-600 dark:text-blue-500" /> Popular Groups</h3>
-            <div className="space-y-3">
-              {["JEE Main April '26", "Organic Chemistry Doubts", "NEET Biology Hub", "Maths Short Tricks"].map((group, i) => (
-                <div key={i} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 dark:border-[#444b55] bg-slate-50 dark:bg-[#2d323c]/70 hover:border-blue-300 dark:hover:border-blue-500/30 hover:bg-white dark:hover:bg-[#22262e]/70 cursor-pointer transition-all">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{group}</span>
-                  <ChevronRight size={14} className="text-slate-400 dark:text-slate-500" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-  );
+
 
   const GoalsView = () => {
     const daysOfWeek = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
