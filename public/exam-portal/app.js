@@ -91,11 +91,14 @@
     // Check for auto-load ID in URL
     const urlParams = new URLSearchParams(window.location.search);
     const autoLoadId = urlParams.get('id');
-    if (autoLoadId && typeof ExamStore !== 'undefined') {
+    const dbid = urlParams.get('dbid');
+
+    if (dbid) {
+      console.log('[App] Auto-loading from DB, ID:', dbid);
+      loadExamFromDb(dbid);
+    } else if (autoLoadId && typeof ExamStore !== 'undefined') {
       console.log('[App] Auto-loading exam ID:', autoLoadId);
       loadSavedExam(parseInt(autoLoadId, 10));
-      // Remove the id from URL to keep it clean (optional)
-      // window.history.replaceState({}, '', window.location.pathname);
     }
   }
 
@@ -356,6 +359,30 @@
         imageMap: exam.imageMap || {}
       }, true); // skipSave = true
     }).catch(err => showError('Failed to load: ' + err.message));
+  }
+
+  async function loadExamFromDb(dbid) {
+    showProcessing('Loading Exam...', 'Fetching data from server');
+    try {
+      const res = await fetch(`/api/exams/${dbid}`);
+      const data = await res.json();
+      if (!data.success) throw new Error(data.message || 'Failed to load exam');
+      
+      const exam = data.exam;
+      const parsedData = JSON.parse(exam.data);
+      
+      selectedTemplate = exam.template || 'custom';
+      hideProcessing();
+      finishProcessing({
+        title: exam.name,
+        questions: parsedData.questions,
+        subjects: parsedData.subjects,
+        imageMap: parsedData.imageMap || {}
+      }, true); // skipSave = true (already in DB)
+    } catch (err) {
+      hideProcessing();
+      showError('Failed to load from DB: ' + err.message);
+    }
   }
 
   function deleteSavedExam(id) {

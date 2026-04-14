@@ -1177,6 +1177,139 @@ app.delete('/api/chats/:chatId', async (req, res) => {
   }
 });
 
+// --- Exam Management API ---
+
+// Create an exam (centralized storage)
+app.post('/api/exams', async (req, res) => {
+  const { userId, name, template, data, questionCount, subjects, isPublic } = req.body;
+  
+  if (!userId || !name || !data) {
+    return res.status(400).json({ success: false, message: 'Missing required fields' });
+  }
+
+  try {
+    const exam = await prisma.exam.create({
+      data: {
+        userId: parseInt(userId, 10),
+        name,
+        template: template || 'custom',
+        data: typeof data === 'string' ? data : JSON.stringify(data),
+        questionCount: parseInt(questionCount, 10) || 0,
+        subjects: Array.isArray(subjects) ? JSON.stringify(subjects) : subjects,
+        isPublic: isPublic === true
+      }
+    });
+    res.json({ success: true, exam });
+  } catch (error) {
+    console.error('Error creating exam:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get personal uploads for a user
+app.get('/api/exams/user/:userId', async (req, res) => {
+  try {
+    const exams = await prisma.exam.findMany({
+      where: { userId: parseInt(req.params.userId, 10) },
+      orderBy: { createdAt: 'desc' },
+      select: {
+          id: true, name: true, template: true, questionCount: true, subjects: true, createdAt: true, isPublic: true, downloads: true
+      }
+    });
+    res.json({ success: true, exams });
+  } catch (error) {
+    console.error('Error fetching user exams:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Browse/Smart Search Exams
+app.get('/api/exams', async (req, res) => {
+  const { query, template } = req.query;
+  try {
+    const where = { isPublic: true };
+    if (template && template !== 'All') where.template = template;
+    if (query) {
+      where.OR = [
+        { name: { contains: query } },
+        { subjects: { contains: query } }
+      ];
+    }
+
+    const exams = await prisma.exam.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      take: 50,
+      include: { user: { select: { name: true } } }
+    });
+    res.json({ success: true, exams });
+  } catch (error) {
+    console.error('Error searching exams:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Trending Exams
+app.get('/api/exams/trending', async (req, res) => {
+  try {
+    const exams = await prisma.exam.findMany({
+      where: { isPublic: true },
+      orderBy: { downloads: 'desc' },
+      take: 5,
+      include: { user: { select: { name: true } } }
+    });
+    res.json({ success: true, exams });
+  } catch (error) {
+    console.error('Error fetching trending exams:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Get full exam data by ID (for loading into portal)
+app.get('/api/exams/:id', async (req, res) => {
+    try {
+        const exam = await prisma.exam.findUnique({
+            where: { id: parseInt(req.params.id, 10) }
+        });
+        if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
+        
+        // Return full data
+        res.json({ success: true, exam });
+    } catch (error) {
+        console.error('Error fetching exam data:', error);
+        res.status(500).json({ success: false, message: 'Server error' });
+    }
+});
+
+// Delete an exam
+app.delete('/api/exams/:id', async (req, res) => {
+  const { userId } = req.body;
+  try {
+    const exam = await prisma.exam.findUnique({ where: { id: parseInt(req.params.id, 10) } });
+    if (!exam) return res.status(404).json({ success: false, message: 'Exam not found' });
+    if (exam.userId !== parseInt(userId, 10)) return res.status(403).json({ success: false, message: 'Unauthorized' });
+
+    await prisma.exam.delete({ where: { id: parseInt(req.params.id, 10) } });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Error deleting exam:', error);
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Increment downloads
+app.post('/api/exams/:id/download', async (req, res) => {
+    try {
+        await prisma.exam.update({
+            where: { id: parseInt(req.params.id, 10) },
+            data: { downloads: { increment: 1 } }
+        });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false });
+    }
+});
+
 // PDF Upload & Processing API (for Exam Portal integration)
 app.post('/api/upload-pdf', upload.single('file'), async (req, res) => {
   if (!req.file) {

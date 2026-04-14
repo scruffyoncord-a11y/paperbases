@@ -31,6 +31,7 @@ model User {
   highlights  Highlight[]
   chats       Chat[]
   messages    Message[]
+  exams       Exam[]
 }
 
 model Resource {
@@ -200,4 +201,24 @@ model Message {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([chatId])
+}
+
+model Exam {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  name          String
+  template      String   // e.g. "jee", "neet", "custom"
+  data          String   // Store structured questions/subjects as JSON string
+  questionCount Int
+  subjects      String?  // JSON string or comma-separated list
+  isPublic      Boolean  @default(false)
+  downloads     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([template])
+  @@index([createdAt])
 }

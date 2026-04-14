@@ -1929,7 +1929,11 @@ export default function App() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const fileInputRef = React.useRef(null);
+  const [testsSubTab, setTestsSubTab] = useState('Browse');
   const [examSearchQuery, setExamSearchQuery] = useState('');
+  const [publicExams, setPublicExams] = useState([]);
+  const [trendingExams, setTrendingExams] = useState([]);
+  const [isLoadingExams, setIsLoadingExams] = useState(false);
   const [selectedExamForPYQ, setSelectedExamForPYQ] = useState(null);
   const [pyqSubject, setPyqSubject] = useState('Physics');
   const [selectedDay, setSelectedDay] = useState(new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(new Date()));
@@ -2259,10 +2263,34 @@ export default function App() {
   }, [activeTab]);
 
   useEffect(() => {
-    if (activeTab === 'Tests' && window.ExamStore) {
-      window.ExamStore.listExams().then(setSavedExams).catch(console.error);
+    if (activeTab === 'Tests') {
+      fetchExams();
     }
-  }, [activeTab]);
+  }, [activeTab, testsSubTab, examSearchQuery]);
+
+  const fetchExams = async () => {
+    if (!user?.id) return;
+    setIsLoadingExams(true);
+    try {
+      if (testsSubTab === 'My Uploads') {
+        const res = await fetch(`/api/exams/user/${user.id}`);
+        const data = await res.json();
+        setSavedExams(data.exams || []);
+      } else if (testsSubTab === 'Browse') {
+        const res = await fetch(`/api/exams?query=${encodeURIComponent(examSearchQuery)}`);
+        const data = await res.json();
+        setPublicExams(data.exams || []);
+      } else if (testsSubTab === 'Trending') {
+        const res = await fetch('/api/exams/trending');
+        const data = await res.json();
+        setTrendingExams(data.exams || []);
+      }
+    } catch (err) {
+      console.error('Error fetching exams:', err);
+    } finally {
+      setIsLoadingExams(false);
+    }
+  };
 
   const handleExamFileUpload = async (e) => {
     const file = e.target.files[0];
@@ -2314,17 +2342,26 @@ export default function App() {
     if (!result.questions || result.questions.length === 0) {
       throw new Error('No questions found in this file.');
     }
-    const id = await window.ExamStore.saveExam({
-      name: fileName.replace(/\.[^/.]+$/, ""),
-      template: examTemplate,
-      questions: result.questions,
-      subjects: result.subjects,
-      imageMap: result.imageMap
+    const idRes = await fetch('/api/exams', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: user.id,
+        name: fileName.replace(/\.[^/.]+$/, ""),
+        template: examTemplate,
+        data: JSON.stringify({
+          questions: result.questions,
+          subjects: result.subjects,
+          imageMap: result.imageMap
+        }),
+        questionCount: result.questions.length,
+        subjects: JSON.stringify(result.subjects || []),
+        isPublic: true // Default to public for now
+      })
     });
-    window.open(`/exam-portal/index.html?id=${id}`, '_blank');
-    // Refresh list
-    const updated = await window.ExamStore.listExams();
-    setSavedExams(updated);
+    const { exam } = await idRes.json();
+    window.open(`/exam-portal/index.html?dbid=${exam.id}`, '_blank');
+    fetchExams();
   };
 
   useEffect(() => {
@@ -3593,222 +3630,272 @@ export default function App() {
           )}
 
           {activeTab === 'Tests' && (
-            <div className="max-w-4xl mx-auto mt-4 animate-in fade-in duration-500 flex flex-col items-center">
+            <div className="max-w-6xl mx-auto mt-4 animate-in fade-in duration-500 overflow-x-hidden">
               
-              {/* Browse Available Papers Section (On Top) */}
-              <div className="w-full text-left mb-12">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                    <FolderSearch size={20} className="text-blue-600 dark:text-blue-500" />
-                    Browse available papers
-                  </h3>
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer group transition-colors">
-                    View full library <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                  </div>
+              {/* Tests Header & Sub-tabs */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10 px-4">
+                <div>
+                  <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2 flex items-center gap-3">
+                    <ClipboardList className="text-blue-500" size={32} /> Mock Exam Dashboard
+                  </h2>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">Complete mock tests, track progress, and share your papers.</p>
                 </div>
-
-                <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm dark:shadow-lg dark:shadow-black/20">
-                  <div className="relative mb-6">
-                    <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input 
-                      type="text" 
-                      value={examSearchQuery}
-                      onChange={(e) => setExamSearchQuery(e.target.value)}
-                      placeholder="Find a specific mock test or DPP..." 
-                      className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[
-                      { name: 'JEE Previous Year', count: '45 Papers', color: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-500/20' },
-                      { name: 'BITSAT Mock Series', count: '12 Papers', color: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20' },
-                      { name: 'NEET Practice', count: '30 Papers', color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20' },
-                      { name: 'Chapter DPPs', count: '150+ Sets', color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/20' },
-                    ].map((category, idx) => (
-                      <div 
-                        key={idx} 
-                        onClick={() => setExamSearchQuery(category.name)}
-                        className={`p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-md hover:-translate-y-0.5 hover:opacity-80 active:scale-95 ${category.color}`}
-                      >
-                        <h4 className="font-bold text-xs mb-1 text-slate-900 dark:text-white">{category.name}</h4>
-                        <p className="text-[10px] font-medium">{category.count}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="w-full h-px bg-slate-200 dark:bg-white/5 mb-12"></div>
-
-              {/* Exam Format & Upload Container */}
-              <div className="w-full max-w-3xl flex flex-col gap-6 relative z-30">
-                {/* Processing Overlay */}
-                {isProcessingExam && (
-                  <div className="absolute inset-0 bg-white/60 dark:bg-[#0B0E14]/60 backdrop-blur-sm z-[60] flex flex-col items-center justify-center rounded-[2rem] animate-in fade-in duration-300">
-                    <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-4"></div>
-                    <p className="font-bold text-slate-900 dark:text-white">{examProcessingStatus}</p>
-                  </div>
-                )}
-
-                {/* Exam Format Selector (Dropdown) */}
-                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 bg-white dark:bg-[#161923] p-5 rounded-3xl border border-slate-200 dark:border-[#333942] shadow-sm dark:shadow-lg dark:shadow-black/30 relative z-40">
-                  <div className="mt-2">
-                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                      <Settings size={20} className="text-blue-600 dark:text-blue-500" /> Exam Format
-                    </h3>
-                    <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">Select the format before uploading your paper.</p>
-                  </div>
-                  
-                  <div className="flex flex-col w-full sm:w-[380px]">
-                    <div className="relative w-full z-50">
-                      <button 
-                        onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
-                        className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-200 dark:border-[#444b55] bg-slate-50 dark:bg-[#0B0E14] hover:border-blue-400 dark:hover:border-blue-500/50 transition-all shadow-sm"
-                      >
-                        <div className="flex items-center gap-5">
-                          <div className="bg-white dark:bg-[#161923] rounded-2xl border border-slate-100 dark:border-[#2D313E] shadow-sm dark:shadow-none flex items-center justify-center w-[72px] h-[72px] shrink-0 overflow-hidden">
-                            {examTemplates.find(t => t.id === examTemplate)?.icon || <FileText size={44} className="text-slate-400" />}
-                          </div>
-                          <div className="text-left">
-                            <div className="font-bold text-slate-900 dark:text-white text-lg leading-tight">
-                              {examTemplates.find(t => t.id === examTemplate)?.name}
-                            </div>
-                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
-                              {examTemplates.find(t => t.id === examTemplate)?.desc}
-                            </div>
-                          </div>
-                        </div>
-                        <ChevronDown size={24} className={`text-slate-400 transition-transform duration-300 mr-2 ${isDropdownOpen ? 'rotate-180' : ''}`} />
-                      </button>
-
-                      {isDropdownOpen && (
-                        <div className="absolute top-full left-0 sm:right-0 sm:left-auto mt-3 w-full sm:w-[380px] bg-white dark:bg-[#1C1F29] border border-slate-200 dark:border-[#444b55] rounded-3xl shadow-2xl dark:shadow-[0_15px_50px_rgba(0,0,0,0.8)] animate-in fade-in slide-in-from-top-2 duration-200 z-[100]">
-                          <div className="max-h-[460px] overflow-y-auto custom-scrollbar p-3 space-y-2 relative pointer-events-auto">
-                            {examTemplates.map(t => (
-                              <button 
-                                key={t.id} 
-                                onClick={() => {
-                                  setExamTemplate(t.id);
-                                  setIsDropdownOpen(false);
-                                }} 
-                                className={`w-full flex items-center gap-5 p-3 rounded-2xl text-left transition-all ${
-                                  examTemplate === t.id 
-                                    ? 'bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 shadow-sm' 
-                                    : 'border border-transparent hover:bg-slate-50 dark:hover:bg-[#2d323c]'
-                                }`}
-                              >
-                                <div className={`rounded-2xl border flex items-center justify-center w-[72px] h-[72px] shrink-0 overflow-hidden ${
-                                  examTemplate === t.id 
-                                    ? 'bg-white dark:bg-transparent border-blue-100 dark:border-blue-500/30' 
-                                    : 'bg-slate-50 dark:bg-black/20 border-slate-100 dark:border-[#333942]'
-                                }`}>
-                                  {t.icon}
-                                </div>
-                                <div>
-                                  <div className="font-bold text-slate-900 dark:text-white text-base leading-tight mb-1">{t.name}</div>
-                                  <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.desc}</div>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 flex items-start gap-1.5 leading-tight px-2">
-                      <Info size={14} className="shrink-0 mt-[1px] text-amber-500 dark:text-amber-400" />
-                      <span><strong>Disclaimer:</strong> Choose Auto-detect only if not listed here.</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Upload Area */}
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="w-full border-2 border-dashed border-slate-300 dark:border-[#444b55] rounded-[2rem] p-12 bg-white dark:bg-[#161923] hover:bg-slate-50 dark:hover:bg-[#1C1F29] hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors cursor-pointer group relative flex flex-col items-center text-center z-10"
-                >
-                  <input 
-                    type="file" 
-                    ref={fileInputRef}
-                    onChange={handleExamFileUpload} 
-                    className="hidden" 
-                    accept=".pdf,.json,.txt,.md" 
-                  />
-                  <div className="mb-6 w-16 h-16 bg-slate-50 dark:bg-[#0B0E14] rounded-full flex items-center justify-center border border-slate-200 dark:border-[#333942] shadow-sm dark:shadow-md dark:shadow-black/40 group-hover:scale-110 transition-all duration-300">
-                    <UploadCloud size={28} className="text-blue-500 dark:text-blue-400" />
-                  </div>
-                  <h3 className="text-slate-900 dark:text-white font-bold text-xl mb-3 tracking-tight">Drag & drop your PDF or JSON file here</h3>
-                  <p className="text-slate-500 text-sm mb-6">or</p>
-                  <button className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-[0_4px_15px_rgba(37,99,235,0.2)] dark:shadow-[0_0_15px_rgba(37,99,235,0.3)] group-hover:bg-blue-700 dark:group-hover:bg-blue-500 group-hover:shadow-[0_6px_20px_rgba(37,99,235,0.3)] dark:group-hover:shadow-[0_0_25px_rgba(37,99,235,0.5)] transition-all mb-6">
-                    Browse Files
-                  </button>
-                  <p className="text-[12px] font-medium text-slate-500">
-                    Supports PDF (via OCR), JSON, and OCR Markdown/Text files
-                  </p>
-                </div>
-              </div>
-
-              {/* Try Sample Data Button */}
-              <button onClick={() => {
-                const dummyText = `# Sample Exam\n\n1. Example question?\n(A) Option 1 (B) Option 2 (C) Option 3 (D) Option 4`;
-                const result = window.ExamParser.parseMarkdown(dummyText);
-                saveAndLaunchExam('Sample Exam.txt', result);
-              }} className="mt-8 flex items-center gap-2 px-6 py-3 rounded-2xl border border-slate-200 dark:border-[#333942] bg-white/80 dark:bg-[#161923]/80 hover:bg-slate-50 dark:hover:bg-[#1C1F29] hover:border-slate-300 dark:hover:border-[#444b55] transition-colors text-slate-700 dark:text-slate-300 text-sm font-bold shadow-sm dark:shadow-lg dark:shadow-black/20">
-                <Sparkles size={16} className="text-amber-500 dark:text-amber-400" /> Try with sample data
-              </button>
-
-              {/* Saved Exams Section */}
-              <div className="w-full max-w-3xl mt-12 mb-8">
-                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-3 mb-6">
-                  <div className="flex -space-x-1.5">
-                    <div className="w-3.5 h-4 rounded-sm bg-emerald-500"></div>
-                    <div className="w-3.5 h-4 rounded-sm bg-rose-500"></div>
-                    <div className="w-3.5 h-4 rounded-sm bg-blue-500"></div>
-                  </div>
-                  Saved Exams
-                </h3>
                 
-                {savedExams.length === 0 ? (
-                  <div className="p-10 text-center bg-slate-50/50 dark:bg-white/5 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 text-slate-400 font-bold text-sm">
-                    No saved exams yet. Upload a paper to get started!
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {savedExams.map(ex => (
-                      <div key={ex.id} className="bg-white/80 dark:bg-[#161923]/80 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-slate-300 dark:hover:border-[#444b55] transition-colors group gap-4">
-                        <div>
-                          <h4 className="font-bold text-slate-900 dark:text-white text-[15px] mb-2">{ex.name}</h4>
-                          <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
-                            <span className="text-orange-600 dark:text-orange-400 capitalize">{ex.template}</span>
-                            <span>{ex.questionCount} Qs</span>
-                            <span>{new Date(ex.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                <div className="flex bg-slate-100 dark:bg-white/5 p-1.5 rounded-2xl border border-slate-200 dark:border-white/10 w-full md:w-auto overflow-x-auto no-scrollbar">
+                  {['Browse', 'Upload', 'My Uploads', 'Trending'].map(tab => (
+                    <button 
+                      key={tab} 
+                      onClick={() => setTestsSubTab(tab)}
+                      className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${
+                        testsSubTab === tab 
+                          ? 'bg-white dark:bg-white/10 text-blue-600 dark:text-white shadow-sm border border-slate-200 dark:border-white/10' 
+                          : 'text-slate-500 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/60 border border-transparent'
+                      }`}
+                    >
+                      {tab}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Browse Tab Content */}
+              {testsSubTab === 'Browse' && (
+                <div className="px-4 space-y-8">
+                  {/* Search and Quick Filters */}
+                  <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-3xl p-8 shadow-sm dark:shadow-lg dark:shadow-black/20">
+                    <div className="relative mb-8">
+                      <Search size={22} className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500" />
+                      <input 
+                        type="text" 
+                        value={examSearchQuery}
+                        onChange={(e) => setExamSearchQuery(e.target.value)}
+                        placeholder="Search for JEE Main, BITSAT, NEET full tests..." 
+                        className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-[1.25rem] py-4 pl-14 pr-6 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-base text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600 shadow-inner"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { name: 'JEE Main', icon: '/cbse_logo.png', count: '1k+ Papers', color: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-500/20' },
+                        { name: 'BITSAT', icon: 'https://i.postimg.cc/hvR8rBn1/image.png', count: '450+ Papers', color: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-200 dark:border-blue-500/20' },
+                        { name: 'NEET', icon: '/cbse_logo.png', count: '800+ Papers', color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20' },
+                        { name: 'Chapter Wise', icon: null, count: '3k+ Sets', color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/20' },
+                      ].map((item, idx) => (
+                        <div 
+                          key={idx} 
+                          onClick={() => setExamSearchQuery(item.name)}
+                          className={`p-5 rounded-3xl border transition-all cursor-pointer hover:shadow-xl hover:-translate-y-1 active:scale-95 group flex items-center gap-4 ${item.color}`}
+                        >
+                          <div className="w-12 h-12 bg-white dark:bg-black/20 rounded-2xl flex items-center justify-center border border-inherit/40 shadow-sm overflow-hidden p-2">
+                            {item.icon ? <img src={item.icon} className="w-full h-full object-contain" /> : <Layers size={24} />}
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-sm text-slate-900 dark:text-white mb-0.5">{item.name}</h4>
+                            <p className="text-[10px] font-black uppercase tracking-wider opacity-60">{item.count}</p>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3 w-full md:w-auto">
-                          <button 
-                            onClick={() => window.open(`/exam-portal/index.html?id=${ex.id}`, '_blank')}
-                            className="flex-1 md:flex-none bg-slate-50 dark:bg-[#1C1F29] border border-slate-200 dark:border-[#444b55] hover:border-blue-400 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-[#22262e] text-slate-700 dark:text-slate-300 px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm"
-                          >
-                            Load
-                          </button>
-                          <button 
-                            onClick={async () => {
-                              if(window.confirm('Delete this saved exam?')) {
-                                await window.ExamStore.deleteExam(ex.id);
-                                setSavedExams(await window.ExamStore.listExams());
-                              }
-                            }}
-                            className="bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 hover:bg-rose-100 dark:hover:bg-rose-500/20 hover:border-rose-200 dark:hover:border-rose-500/30 text-rose-600 dark:text-rose-400 p-2.5 rounded-xl transition-all"
-                          >
-                            <X size={18} strokeWidth={2.5} />
-                          </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Public Exam List */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {isLoadingExams ? (
+                      Array(6).fill(0).map((_, i) => <div key={i} className="h-48 rounded-3xl bg-slate-100 dark:bg-white/5 animate-pulse"></div>)
+                    ) : publicExams.length > 0 ? (
+                      publicExams.map(ex => (
+                        <div key={ex.id} className="bg-white dark:bg-[#161923] border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-blue-500/50 transition-all group flex flex-col justify-between h-full relative overflow-hidden">
+                           <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity"><ClipboardList size={80} /></div>
+                           <div>
+                             <div className="flex items-center gap-3 mb-4">
+                               <div className="w-10 h-10 rounded-xl bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-[#333942] flex items-center justify-center">
+                                 {ex.template === 'jee' || ex.template === 'neet' ? <img src="/cbse_logo.png" className="w-6 h-6 object-contain" /> : <FileText className="text-blue-500" size={20} />}
+                               </div>
+                               <div>
+                                 <h4 className="font-bold text-slate-900 dark:text-white line-clamp-1">{ex.name}</h4>
+                                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{ex.template}</p>
+                               </div>
+                             </div>
+                             <div className="flex flex-wrap gap-2 mb-6">
+                               <span className="px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold border border-blue-100 dark:border-blue-500/20">{ex.questionCount} Questions</span>
+                               {JSON.parse(ex.subjects || '[]').slice(0, 2).map((s, i) => (
+                                 <span key={i} className="px-2.5 py-1 rounded-lg bg-slate-50 dark:bg-white/5 text-slate-500 dark:text-slate-400 text-[10px] font-bold border border-slate-200 dark:border-white/10">{s}</span>
+                               ))}
+                             </div>
+                           </div>
+                           <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-100 dark:border-white/5 mt-auto">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500">
+                                <TrendingUp size={14} className="text-emerald-500" /> {ex.downloads} Loads
+                              </div>
+                              <button 
+                                onClick={async () => {
+                                  await fetch(`/api/exams/${ex.id}/download`, { method: 'POST' });
+                                  window.open(`/exam-portal/index.html?dbid=${ex.id}`, '_blank');
+                                  fetchExams();
+                                }}
+                                className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:scale-105 transition-all shadow-md active:scale-95"
+                              >
+                                Take Exam
+                              </button>
+                           </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="col-span-full py-20 text-center">
+                        <div className="w-16 h-16 bg-slate-100 dark:bg-white/5 rounded-full flex items-center justify-center mx-auto mb-4"><Search size={24} className="text-slate-300" /></div>
+                        <p className="font-bold text-slate-500">No exams found matching your search.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Upload Tab Content */}
+              {testsSubTab === 'Upload' && (
+                <div className="max-w-4xl mx-auto px-4 flex flex-col items-center py-4">
+                  <div className="w-full max-w-3xl flex flex-col gap-8 relative z-30">
+                    {/* Processing Overlay */}
+                    {isProcessingExam && (
+                      <div className="absolute inset-0 bg-white/60 dark:bg-[#0B0E14]/60 backdrop-blur-md z-[60] flex flex-col items-center justify-center rounded-[2.5rem] animate-in fade-in duration-300">
+                        <div className="w-16 h-16 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-6"></div>
+                        <p className="font-bold text-slate-900 dark:text-white text-lg">{examProcessingStatus}</p>
+                        <p className="text-sm text-slate-500 mt-2 animate-pulse">Large OCR files can take up to 30 seconds</p>
+                      </div>
+                    )}
+
+                    <div className="bg-white/80 dark:bg-[#161923]/80 backdrop-blur-xl border border-slate-200 dark:border-[#333942] p-8 rounded-[2.5rem] shadow-sm dark:shadow-2xl dark:shadow-black/40">
+                      <div className="flex flex-col md:flex-row gap-10 items-start">
+                        <div className="flex-1">
+                          <h3 className="text-xl font-black text-slate-900 dark:text-white flex items-center gap-3 mb-4">
+                            <Settings size={22} className="text-blue-600 dark:text-blue-500" /> 
+                            Exam Configuration
+                          </h3>
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mb-8 leading-relaxed">
+                            Configure how your paper is parsed. Correct choice of exam format ensures precise scoring and subject division.
+                          </p>
+
+                          <div className="space-y-4">
+                             {examTemplates.map(t => (
+                               <button 
+                                 key={t.id} 
+                                 onClick={() => setExamTemplate(t.id)} 
+                                 className={`w-full flex items-center gap-4 p-4 rounded-2xl text-left transition-all border ${
+                                   examTemplate === t.id 
+                                     ? 'bg-blue-50 dark:bg-blue-500/10 border-blue-200 dark:border-blue-500/40 shadow-sm' 
+                                     : 'bg-slate-50 dark:bg-black/20 border-slate-100 dark:border-white/5 hover:border-slate-300 dark:hover:border-white/10'
+                                 }`}
+                               >
+                                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center border ${examTemplate === t.id ? 'bg-white dark:bg-black/30 border-blue-200 dark:border-blue-500/30' : 'bg-white dark:bg-[#0B0E14] border-slate-200 dark:border-white/5'}`}>
+                                   {t.id === 'custom' ? <FileText className="text-slate-400" size={24} /> : <img src={t.id === 'bitsat' ? "https://i.postimg.cc/hvR8rBn1/image.png" : "/cbse_logo.png"} className="w-8 h-8 object-contain" />}
+                                 </div>
+                                 <div>
+                                   <div className="font-bold text-sm text-slate-900 dark:text-white">{t.name}</div>
+                                   <div className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t.desc}</div>
+                                 </div>
+                               </button>
+                             ))}
+                          </div>
+                        </div>
+
+                        <div className="w-full md:w-[400px]">
+                           <div 
+                              onClick={() => fileInputRef.current?.click()}
+                              className="w-full border-2 border-dashed border-slate-300 dark:border-[#444b55] rounded-[2.5rem] p-12 bg-white dark:bg-black/20 hover:bg-slate-50 dark:hover:bg-white/5 hover:border-blue-400 dark:hover:border-blue-500/50 transition-all cursor-pointer group relative flex flex-col items-center text-center h-[460px] justify-center"
+                            >
+                              <input 
+                                type="file" 
+                                ref={fileInputRef}
+                                onChange={handleExamFileUpload} 
+                                className="hidden" 
+                                accept=".pdf,.json,.txt,.md" 
+                              />
+                              <div className="mb-8 w-20 h-20 bg-blue-50 dark:bg-blue-500/10 rounded-[2rem] flex items-center justify-center border border-blue-100 dark:border-blue-500/20 shadow-lg group-hover:scale-110 transition-transform duration-500">
+                                <UploadCloud size={32} className="text-blue-600 dark:text-blue-400" />
+                              </div>
+                              <h3 className="text-slate-900 dark:text-white font-black text-2xl mb-4 tracking-tight">Drop your paper</h3>
+                              <p className="text-slate-500 text-sm mb-10 px-6">We'll automatically extract questions and answers for you.</p>
+                              <button className="bg-slate-900 dark:bg-white text-white dark:text-slate-900 px-10 py-4 rounded-[1.25rem] font-bold shadow-xl hover:translate-y-[-2px] transition-all active:scale-95 text-sm uppercase tracking-widest">
+                                Browse Files
+                              </button>
+                            </div>
                         </div>
                       </div>
-                    ))}
+                    </div>
+
+                    <button 
+                      onClick={() => {
+                        const dummyText = `# Sample Exam\n\n1. Example question?\n(A) Option 1 (B) Option 2 (C) Option 3 (D) Option 4`;
+                        const result = window.ExamParser.parseMarkdown(dummyText);
+                        saveAndLaunchExam('Sample Exam.txt', result);
+                      }}
+                      className="flex items-center gap-3 px-8 py-4 rounded-[1.5rem] border border-slate-200 dark:border-[#333942] bg-white/50 dark:bg-[#161923]/50 backdrop-blur-sm self-center hover:bg-white dark:hover:bg-[#1C1F29] transition-all text-slate-700 dark:text-slate-300 text-sm font-black uppercase tracking-widest shadow-sm"
+                    >
+                      <Sparkles size={18} className="text-amber-500 animate-pulse" /> Try with sample data
+                    </button>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
+
+              {/* My Uploads / Trending Tabs (Shared List UI) */}
+              {(testsSubTab === 'My Uploads' || testsSubTab === 'Trending') && (
+                <div className="px-4 py-8">
+                  <div className="max-w-4xl mx-auto space-y-4">
+                    {isLoadingExams ? (
+                       Array(4).fill(0).map((_, i) => <div key={i} className="h-24 rounded-3xl bg-slate-100 dark:bg-white/5 animate-pulse"></div>)
+                    ) : (testsSubTab === 'My Uploads' ? savedExams : trendingExams).length > 0 ? (
+                      (testsSubTab === 'My Uploads' ? savedExams : trendingExams).map(ex => (
+                        <div key={ex.id} className="bg-white/80 dark:bg-[#161923]/80 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-3xl p-5 flex flex-col md:flex-row items-center justify-between shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-blue-500/30 transition-all group gap-6">
+                           <div className="flex items-center gap-5 w-full md:w-auto">
+                              <div className="w-14 h-14 rounded-2xl bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-[#333942] flex items-center justify-center shrink-0">
+                                {ex.template === 'jee' || ex.template === 'neet' ? <img src="/cbse_logo.png" className="w-8 h-8 object-contain" /> : <FileText className="text-slate-400" size={28} />}
+                              </div>
+                              <div className="text-left min-w-0">
+                                <h4 className="font-bold text-slate-900 dark:text-white text-base truncate">{ex.name}</h4>
+                                <div className="flex items-center gap-3 mt-1">
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-blue-500">{ex.template}</span>
+                                  <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20"></span>
+                                  <span className="text-xs font-bold text-slate-500">{ex.questionCount} Qs</span>
+                                  <span className="w-1 h-1 rounded-full bg-slate-300 dark:bg-white/20"></span>
+                                  <span className="text-xs font-bold text-slate-500">{new Date(ex.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                                </div>
+                              </div>
+                           </div>
+                           <div className="flex items-center gap-3 w-full md:w-auto">
+                              <button 
+                                onClick={async () => {
+                                  await fetch(`/api/exams/${ex.id}/download`, { method: 'POST' });
+                                  window.open(`/exam-portal/index.html?dbid=${ex.id}`, '_blank');
+                                  if(testsSubTab === 'Trending') fetchExams();
+                                }}
+                                className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
+                              >
+                                {testsSubTab === 'My Uploads' ? 'Launch' : 'Take Exam'}
+                              </button>
+                              {testsSubTab === 'My Uploads' && (
+                                <button 
+                                  onClick={async () => {
+                                    if(window.confirm('Are you sure you want to delete this exam permanently?')) {
+                                      await fetch(`/api/exams/${ex.id}`, { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: user.id}) });
+                                      fetchExams();
+                                    }
+                                  }}
+                                  className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all active:scale-95"
+                                >
+                                  <Trash2 size={20} />
+                                </button>
+                              )}
+                           </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="p-16 text-center bg-slate-50/50 dark:bg-white/5 rounded-[2.5rem] border border-dashed border-slate-200 dark:border-white/10">
+                        <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-white/5 flex items-center justify-center mx-auto mb-4"><ClipboardList size={32} className="text-slate-300" /></div>
+                        <p className="font-bold text-slate-400">No exams to show here yet.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
