@@ -2974,13 +2974,21 @@ export default function App() {
             ))}
           </div>
 
-          {doubts.length === 0 ? (
+          {doubts.filter(d => {
+            if (activeFilter === 'Unanswered') return d.status === 'Unanswered' && d._count?.replies === 0;
+            if (activeFilter === 'Resolved') return d.status === 'Resolved';
+            return true;
+          }).length === 0 ? (
             <div className="py-20 text-center text-slate-500">
                 <MessageSquare size={48} className="mx-auto mb-4 opacity-10" />
                 <p className="font-bold text-lg">No posts yet</p>
                 <p className="text-sm opacity-60">Be the first to start a conversation in this community.</p>
             </div>
-          ) : doubts.map((post) => (
+          ) : doubts.filter(d => {
+            if (activeFilter === 'Unanswered') return d.status === 'Unanswered' && d._count?.replies === 0;
+            if (activeFilter === 'Resolved') return d.status === 'Resolved';
+            return true;
+          }).map((post) => (
             <article key={post.id} onClick={(e) => { if(!e.target.closest('button')) setSelectedDoubt(post); }} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-2xl flex hover:border-slate-400 dark:hover:border-blue-500/30 transition-all cursor-pointer group shadow-sm overflow-hidden">
                {/* Vote Sidebar */}
                <div className="w-10 sm:w-12 bg-slate-50/50 dark:bg-black/10 flex flex-col items-center py-4 gap-1 border-r border-slate-100 dark:border-white/5">
@@ -3617,7 +3625,7 @@ export default function App() {
           {activeTab === 'ChapterPYQs' && <ChapterPYQsView />}
           {activeTab === 'Goals' && <GoalsView />}
           {activeTab === 'Profile' && <ProfileView />}
-          {activeTab === 'Community' && <CommunityView />}
+          {(activeTab === 'Community' || activeTab === 'Doubts') && <CommunityView />}
           {activeTab === 'Resources' && (
             <ResourcesView 
                 syllabusMode={syllabusMode}
@@ -4268,63 +4276,7 @@ export default function App() {
               )}
             </div>
           )}
-          {activeTab === 'Doubts' && (
-            <div className="animate-in fade-in duration-500 max-w-7xl mx-auto">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                <div>
-                  <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-2">Doubt Forum</h2>
-                  <p className="text-sm text-slate-500 dark:text-slate-400">Get help from the community or test your knowledge by solving doubts.</p>
-                </div>
-                <button onClick={() => setShowAskDoubtModal(true)} className="bg-blue-600 text-white px-5 py-2.5 rounded-xl text-sm font-bold shadow-[0_4px_15px_rgba(37,99,235,0.2)] hover:bg-blue-700 transition flex items-center gap-2">
-                  <HelpCircle size={16} /> Ask a Doubt
-                </button>
-              </div>
 
-              <div className="relative mb-8">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input type="text" placeholder="Search for concepts, questions, or topics..." className="w-full bg-white dark:bg-[#161923]/80 border border-slate-200 dark:border-[#333942] rounded-2xl py-3.5 pl-11 pr-4 text-sm font-medium outline-none focus:border-blue-500 transition-all text-slate-900 dark:text-white shadow-sm dark:shadow-none" />
-              </div>
-
-              <div className="flex gap-3 border-b border-slate-200 dark:border-[#333942] pb-6 mb-8 overflow-x-auto no-scrollbar mask-gradient-right">
-                {['All', 'Unanswered', 'My Doubts', 'Resolved'].map(tab => (
-                  <button 
-                    key={tab} 
-                    onClick={() => setDoubtTab(tab)}
-                    className={`whitespace-nowrap px-5 py-2 text-sm font-bold rounded-xl transition-all border ${doubtTab === tab ? 'bg-slate-100 dark:bg-[#22262e] text-slate-900 dark:text-white border-slate-200 dark:border-[#444b55]' : 'border-transparent text-slate-500 hover:text-slate-900 dark:hover:text-white hover:bg-slate-50 dark:hover:bg-[#22262e]/50'}`}
-                  >
-                    {tab}
-                  </button>
-                ))}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                {doubts.filter(d => {
-                  if (doubtTab === 'Unanswered') return d.status === 'Unanswered' && d._count?.replies === 0;
-                  if (doubtTab === 'My Doubts') return d.userId === user?.id;
-                  if (doubtTab === 'Resolved') return d.status === 'Resolved';
-                  return true;
-                }).map((doubt) => (
-                  <div key={doubt.id} onClick={() => setSelectedDoubt(doubt)} className="bg-white dark:bg-[#161923] p-7 rounded-2xl border border-slate-200 dark:border-[#333942] shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-slate-300 dark:hover:border-slate-600 transition duration-300 cursor-pointer group flex flex-col h-full relative overflow-hidden">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-gradient-to-br from-white/5 to-transparent rounded-bl-full pointer-events-none opacity-50"></div>
-                    <div className="flex justify-between items-start mb-5 relative z-10">
-                      <span className={`text-[9px] font-black tracking-widest uppercase px-2.5 py-1 rounded-full ${getSubjectColor(doubt.subject)}`}>{doubt.subject}</span>
-                      <span className={`text-[10px] font-extrabold px-2 py-0.5 rounded border ${getStatusColor(doubt.status, doubt._count?.replies)}`}>{getStatusText(doubt.status, doubt._count?.replies)}</span>
-                    </div>
-                    <h4 className="font-bold text-slate-900 dark:text-white text-lg mb-8 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition leading-snug flex-1 relative z-10">{doubt.title}</h4>
-                    <div className="border-t border-slate-100 dark:border-[#333942] pt-5 flex items-center gap-2.5 mt-auto relative z-10">
-                      <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-[#2d323c] overflow-hidden flex items-center justify-center text-slate-500 border border-slate-200 dark:border-[#444b55]">
-                        {doubt.user?.picture ? <img src={doubt.user.picture} alt="" className="w-full h-full object-cover" /> : <User size={12} strokeWidth={3} />}
-                      </div>
-                      <span className="text-xs font-bold text-slate-900 dark:text-white">{doubt.user?.name || 'Anonymous'} <span className="text-slate-400 dark:text-slate-500 font-medium ml-1">• {timeAgo(doubt.createdAt)}</span></span>
-                    </div>
-                  </div>
-                ))}
-                {doubts.length === 0 && (
-                  <div className="col-span-full py-12 text-center text-slate-500 dark:text-slate-400 font-medium">No doubts asked yet. Be the first!</div>
-                )}
-              </div>
-            </div>
-          )}
 
 
           {activeTab !== 'Home' && activeTab !== 'Tests' && activeTab !== 'Resources' && activeTab !== 'Syllabus' && activeTab !== 'Notes' && activeTab !== 'Profile' && activeTab !== 'Community' && activeTab !== 'Goals' && activeTab !== 'Doubts' && activeTab !== 'ChapterPYQs' && activeTab !== 'StudyRoom' && (
