@@ -8,6 +8,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import { extractTextFromPdf } from './server/pdf_service.js';
+import multer from 'multer';
+
+const upload = multer({ storage: multer.memoryStorage() });
+const jobs = new Map();
 
 dotenv.config();
 
@@ -1171,6 +1175,36 @@ app.delete('/api/chats/:chatId', async (req, res) => {
     console.error('Error deleting chat:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
+});
+
+// PDF Upload & Processing API (for Exam Portal integration)
+app.post('/api/upload-pdf', upload.single('file'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ success: false, message: 'No file uploaded' });
+  }
+
+  const jobId = Math.random().toString(36).substring(7);
+  jobs.set(jobId, { status: 'processing', progress: '0%', result: null });
+
+  // Process in background
+  extractTextFromPdf(req.file.buffer, { maxPages: 50 })
+    .then(text => {
+      jobs.set(jobId, { status: 'done', result: text });
+    })
+    .catch(err => {
+      console.error(`Job ${jobId} failed:`, err);
+      jobs.set(jobId, { status: 'failed', error: err.message });
+    });
+
+  res.json({ success: true, jobId });
+});
+
+app.get('/api/status/:id', (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (!job) {
+    return res.status(404).json({ success: false, message: 'Job not found' });
+  }
+  res.json(job);
 });
 
 // Production: Serve frontend
