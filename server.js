@@ -1365,7 +1365,7 @@ async function processPaddleOcr(localId, pdfBuffer, originalName) {
 
     const submitResp = await axios.post(PADDLE_JOB_URL, formData, {
       headers: { ...formData.getHeaders(), 'Authorization': `bearer ${PADDLE_TOKEN}` },
-      timeout: 45000
+      timeout: 120000 // Increased to 120s for large files
     });
 
     if (submitResp.status !== 200) throw new Error(`PaddleOCR Submit Error: ${submitResp.status}`);
