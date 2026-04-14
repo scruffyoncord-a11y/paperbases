@@ -72,7 +72,8 @@ import {
   Play,
   PlayCircle,
   Tv,
-  MonitorPlay
+  MonitorPlay,
+  Save
 } from 'lucide-react';
 import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
 import { PolicyAcceptanceModal } from './Policies';
@@ -2517,9 +2518,9 @@ export default function App() {
   const exams = [
     { id: 'jee', name: 'JEE', color: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400', border: 'border-orange-200 dark:border-orange-500/20', img: '/cbse_logo.png' },
     { id: 'neet', name: 'NEET', color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400', border: 'border-emerald-200 dark:border-emerald-500/20', img: '/cbse_logo.png' },
-    { id: 'bitsat', name: 'BITSAT', color: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-500/20', img: '/bitsat_logo.png' },
+    { id: 'bitsat', name: 'BITSAT', color: 'bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-500/20', img: 'https://i.postimg.cc/hvR8rBn1/image.png' },
     { id: 'viteee', name: 'VITEEE', color: 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400', border: 'border-indigo-200 dark:border-indigo-500/20', img: 'https://i.postimg.cc/xC5LVFb5/image.png' },
-    { id: 'kcet', name: 'KCET', color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-500/20', img: '/kcet_logo.png' },
+    { id: 'kcet', name: 'KCET', color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-500/20', img: 'https://i.postimg.cc/hGPS3yg2/image.png' },
     { id: 'comedk', name: 'COMEDK', color: 'bg-slate-50 dark:bg-slate-500/10 text-slate-600 dark:text-slate-400', border: 'border-slate-200 dark:border-slate-500/20', img: 'https://i.postimg.cc/ry59QQm6/Untitled.png' },
     { id: 'cuet', name: 'CUET', color: 'bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400', border: 'border-sky-200 dark:border-sky-500/20', img: '/cbse_logo.png' },
     { id: 'keam', name: 'KEAM', color: 'bg-rose-50 dark:bg-rose-500/10 text-rose-600 dark:text-rose-400', border: 'border-rose-200 dark:border-rose-200/20', img: '/keam_logo.png' },

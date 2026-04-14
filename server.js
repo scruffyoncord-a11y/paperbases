@@ -169,6 +169,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Please login using Google' });
     }
 
+    const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(400).json({ success: false, message: 'Invalid credentials' });
     }
@@ -775,8 +776,8 @@ app.post('/api/highlights', async (req, res) => {
         text,
         pageIndex: parseInt(pageIndex, 10) || 0,
         color: color || 'yellow',
-        position: position || undefined,
-        content: content || undefined
+        position: position ? (typeof position === 'string' ? position : JSON.stringify(position)) : undefined,
+        content: content ? (typeof content === 'string' ? content : JSON.stringify(content)) : undefined
       },
       include: {
         resource: { select: { title: true } }
