@@ -1924,7 +1924,7 @@ export default function App() {
   const [homeTab, setHomeTab] = useState('All');
   const [resourceTab, setResourceTab] = useState('Quick Access');
   const [activeFilter, setActiveFilter] = useState('All');
-  const [examTemplate, setExamTemplate] = useState('custom');
+  const [doubtSubjectFilter, setDoubtSubjectFilter] = useState('All');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [savedExams, setSavedExams] = useState([]);
   const [isProcessingExam, setIsProcessingExam] = useState(false);
@@ -2943,8 +2943,127 @@ export default function App() {
   };
 
 
+  const DoubtsView = () => (
+    <section className="animate-in fade-in duration-500 max-w-7xl mx-auto">
+      {/* Hero Section */}
+      <div className="bg-gradient-to-br from-blue-600 to-indigo-700 rounded-[2.5rem] p-8 md:p-12 mb-8 relative overflow-hidden shadow-2xl shadow-blue-900/20">
+        <div className="absolute top-0 right-0 w-96 h-96 bg-white/10 rounded-full blur-3xl translate-x-1/3 -translate-y-1/3 pointer-events-none"></div>
+        <div className="max-w-3xl mx-auto text-center relative z-10">
+          <h2 className="text-3xl md:text-5xl font-black text-white mb-6 leading-tight">Got a doubt? We got the solution.</h2>
+          <div className="flex flex-col sm:flex-row gap-3 bg-white dark:bg-[#161923] p-2 rounded-2xl md:rounded-full shadow-lg">
+            <div className="flex-1 flex items-center pl-4">
+              <Search className="text-slate-400" size={20} />
+              <input type="text" placeholder="Type your question..." className="w-full bg-transparent border-none py-3 px-4 text-slate-900 dark:text-white font-medium outline-none" />
+            </div>
+            <div className="flex gap-2">
+              <button onClick={() => setShowAskDoubtModal(true)} className="flex items-center gap-2 bg-blue-50 dark:bg-blue-500/10 hover:bg-blue-100 dark:hover:bg-blue-500/20 text-blue-600 dark:text-blue-400 transition-colors px-4 py-3 rounded-xl md:rounded-full text-sm font-bold"><ImageIcon size={18} /> <span className="hidden sm:inline">Upload</span></button>
+              <button onClick={() => setShowAskDoubtModal(true)} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-md px-6 py-3 rounded-xl md:rounded-full text-sm font-bold"><Send size={18} /> Ask</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="lg:col-span-3 space-y-6">
+          {/* Subject Category Filters */}
+          <div className="flex gap-3 overflow-x-auto no-scrollbar mask-gradient-right pb-2">
+            {['All', 'Maths', 'Physics', 'Chemistry', 'Biology'].map(sub => (
+              <button 
+                key={sub}
+                onClick={() => setDoubtSubjectFilter(sub)}
+                className={`px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all border ${doubtSubjectFilter === sub ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-md border-transparent' : 'bg-white dark:bg-[#161923] text-slate-600 dark:text-slate-400 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'}`}
+              >
+                {sub}
+              </button>
+            ))}
+          </div>
 
+          {/* Doubt Cards List */}
+          <div className="grid grid-cols-1 gap-4">
+            {doubts.filter(d => doubtSubjectFilter === 'All' || d.subject === doubtSubjectFilter).length === 0 ? (
+                <div className="py-24 text-center">
+                    <HelpCircle size={48} className="mx-auto text-slate-300 dark:text-white/10 mb-4" />
+                    <h3 className="text-xl font-bold text-slate-700 dark:text-slate-300">No doubts found</h3>
+                    <p className="text-slate-500 mt-2">Try switching subjects or ask a new question.</p>
+                </div>
+            ) : doubts.filter(d => doubtSubjectFilter === 'All' || d.subject === doubtSubjectFilter).map((doubt) => (
+                <div key={doubt.id} onClick={() => setSelectedDoubt(doubt)} className="bg-white dark:bg-[#161923] border border-slate-200 dark:border-white/5 rounded-2xl p-5 hover:shadow-lg hover:border-blue-300 dark:hover:border-blue-500/30 transition-all cursor-pointer group flex flex-col xl:flex-row gap-6">
+                    <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-3">
+                            <span className={`text-[10px] uppercase tracking-widest font-black px-2 py-1 rounded-md ${getSubjectColor(doubt.subject)}`}>{doubt.subject}</span>
+                            {doubt.status === 'Resolved' && <span className="text-[10px] uppercase tracking-widest font-black px-2 py-1 rounded-md bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400 flex items-center gap-1"><CheckCircle2 size={12}/> Expert Verified</span>}
+                            {doubt.status !== 'Resolved' && <span className="text-[10px] uppercase tracking-widest font-black px-2 py-1 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400">Needs Answer</span>}
+                        </div>
+                        <h3 className="text-lg font-black text-slate-900 dark:text-white leading-snug group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors mb-2">{doubt.title}</h3>
+                        <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 mb-4 leading-relaxed">{doubt.content}</p>
+                        
+                         <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-white/10 overflow-hidden flex items-center justify-center">
+                                    {doubt.user?.picture ? <img src={doubt.user.picture} className="w-full h-full object-cover"/> : <User size={12} className="text-slate-400" />}
+                                </div>
+                                <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{doubt.user?.name || "User"}</span>
+                                <UserBadge u={doubt.user} />
+                                <span className="text-[10px] text-slate-400 font-medium ml-2">• {timeAgo(doubt.createdAt)}</span>
+                            </div>
+                        </div>
+                    </div>
+                    {doubt.imageUrl && (
+                        <div className="w-full xl:w-32 h-32 shrink-0 rounded-xl overflow-hidden bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 self-center">
+                            <img src={doubt.imageUrl} className="w-full h-full object-cover" />
+                        </div>
+                    )}
+                    <div className="flex xl:flex-col items-center justify-center gap-2 justify-end border-t xl:border-t-0 xl:border-l border-slate-100 dark:border-white/5 pt-4 xl:pt-0 xl:pl-6">
+                        {doubt.status === 'Resolved' ? (
+                            <button className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-500/20 px-5 py-2.5 rounded-xl text-sm font-bold transition-all w-full xl:w-auto text-nowrap">View Solution</button>
+                        ) : (
+                            <button className="bg-blue-50 dark:bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-500/20 px-5 py-2.5 rounded-xl text-sm font-bold transition-all w-full xl:w-auto flex items-center justify-center gap-2 text-nowrap">Provide Answer</button>
+                        )}
+                        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest text-center mt-1 w-full text-nowrap">{doubt._count?.replies || 0} Answers</div>
+                    </div>
+                </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Right Sidebar - Educational Metrics */}
+        <div className="space-y-6">
+          <div className="bg-gradient-to-b from-amber-50 to-white dark:from-amber-500/10 dark:to-[#161923] border border-amber-200 dark:border-amber-500/20 p-6 rounded-3xl relative overflow-hidden">
+             <Trophy size={100} className="absolute -bottom-8 -right-8 text-amber-500/20 rotate-12 pointer-events-none" />
+             <h3 className="font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2 text-lg"><Award className="text-amber-500" size={20} /> Top Experts</h3>
+             <div className="space-y-4 relative z-10">
+                {[...doubts].filter(d => d.user && d.user.profession === 'Teacher').slice(0, 3).map((d, i) => (
+                    <div key={i} className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-white dark:bg-white/10 flex items-center justify-center text-xs font-black text-slate-400 shadow-sm">#{i+1}</div>
+                        <div className="flex-1">
+                            <div className="text-sm font-bold text-slate-900 dark:text-white leading-tight">{d.user.name}</div>
+                            <div className="text-[10px] text-amber-600 dark:text-amber-400 font-bold uppercase tracking-widest">{d.user.experience}</div>
+                        </div>
+                    </div>
+                ))}
+                {doubts.filter(d => d.user && d.user.profession === 'Teacher').length === 0 && (
+                    <div className="text-sm text-slate-500 font-medium">No verified experts active recently.</div>
+                )}
+             </div>
+          </div>
+
+          <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/5 p-6 rounded-3xl">
+            <h3 className="font-black text-slate-900 dark:text-white mb-4 flex items-center gap-2 text-lg"><TrendingUp className="text-blue-500" size={20} /> Recommended</h3>
+            <div className="space-y-3">
+                {doubts.slice(0, 4).map((d, i) => (
+                    <div key={i} onClick={() => setSelectedDoubt(d)} className="p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-white/5 cursor-pointer transition-colors border border-transparent hover:border-slate-200 dark:hover:border-white/10">
+                        <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 line-clamp-2 leading-snug">{d.title}</h4>
+                        <div className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1.5 flex items-center gap-2">
+                           <span><MessageCircle size={10} className="inline mr-1" />{d._count?.replies} answers</span>
+                        </div>
+                    </div>
+                ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
 
   const CommunityView = () => (
     <section className="animate-in fade-in duration-500">
@@ -3625,7 +3744,8 @@ export default function App() {
           {activeTab === 'ChapterPYQs' && <ChapterPYQsView />}
           {activeTab === 'Goals' && <GoalsView />}
           {activeTab === 'Profile' && <ProfileView />}
-          {(activeTab === 'Community' || activeTab === 'Doubts') && <CommunityView />}
+          {activeTab === 'Community' && <CommunityView />}
+          {activeTab === 'Doubts' && <DoubtsView />}
           {activeTab === 'Resources' && (
             <ResourcesView 
                 syllabusMode={syllabusMode}
