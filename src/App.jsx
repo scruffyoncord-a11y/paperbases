@@ -1923,6 +1923,9 @@ export default function App() {
   const [doubtTab, setDoubtTab] = useState('All');
   const [examTemplate, setExamTemplate] = useState('custom');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [savedExams, setSavedExams] = useState([]);
+  const [isProcessingExam, setIsProcessingExam] = useState(false);
+  const [examProcessingStatus, setExamProcessingStatus] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [selectedExamForPYQ, setSelectedExamForPYQ] = useState(null);
@@ -2252,6 +2255,75 @@ export default function App() {
         .catch(console.error);
     }
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'Tests' && window.ExamStore) {
+      window.ExamStore.listExams().then(setSavedExams).catch(console.error);
+    }
+  }, [activeTab]);
+
+  const handleExamFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const ext = file.name.split('.').pop().toLowerCase();
+    setIsProcessingExam(true);
+    setExamProcessingStatus('Reading file...');
+
+    try {
+      if (ext === 'pdf') {
+        const formData = new FormData();
+        formData.append('file', file);
+        setExamProcessingStatus('Uploading PDF...');
+        const res = await fetch('/api/upload-pdf', { method: 'POST', body: formData });
+        const { jobId } = await res.json();
+        
+        while (true) {
+          await new Promise(r => setTimeout(r, 2000));
+          const statusRes = await fetch(`/api/status/${jobId}`);
+          const statusData = await statusRes.json();
+          if (statusData.status === 'done') {
+             const result = window.ExamParser.parse(statusData.result);
+             await saveAndLaunchExam(file.name, result);
+             break;
+          } else if (statusData.status === 'failed') {
+             throw new Error(statusData.error || 'Conversion failed');
+          }
+          setExamProcessingStatus(`Processing PDF... ${statusData.progress || ''}`);
+        }
+      } else if (ext === 'json') {
+        const text = await file.text();
+        const result = window.ExamParser.parse(JSON.parse(text));
+        await saveAndLaunchExam(file.name, result);
+      } else if (ext === 'md' || ext === 'txt') {
+        const text = await file.text();
+        const result = window.ExamParser.parseMarkdown(text);
+        await saveAndLaunchExam(file.name, result);
+      }
+    } catch (err) {
+      alert('Failed to process exam: ' + err.message);
+    } finally {
+      setIsProcessingExam(false);
+      setExamProcessingStatus('');
+    }
+  };
+
+  const saveAndLaunchExam = async (fileName, result) => {
+    if (!result.questions || result.questions.length === 0) {
+      throw new Error('No questions found in this file.');
+    }
+    const id = await window.ExamStore.saveExam({
+      name: fileName.replace(/\.[^/.]+$/, ""),
+      template: examTemplate,
+      questions: result.questions,
+      subjects: result.subjects,
+      imageMap: result.imageMap
+    });
+    window.open(`/exam-portal/index.html?id=${id}`, '_blank');
+    // Refresh list
+    const updated = await window.ExamStore.listExams();
+    setSavedExams(updated);
+  };
 
   useEffect(() => {
     if (activeTab === 'Goals' && user?.id) {
@@ -3564,6 +3636,14 @@ export default function App() {
 
               {/* Exam Format & Upload Container */}
               <div className="w-full max-w-3xl flex flex-col gap-6 relative z-30">
+                {/* Processing Overlay */}
+                {isProcessingExam && (
+                  <div className="absolute inset-0 bg-white/60 dark:bg-[#0B0E14]/60 backdrop-blur-sm z-[60] flex flex-col items-center justify-center rounded-[2rem] animate-in fade-in duration-300">
+                    <div className="w-12 h-12 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin mb-4"></div>
+                    <p className="font-bold text-slate-900 dark:text-white">{examProcessingStatus}</p>
+                  </div>
+                )}
+
                 {/* Exam Format Selector (Dropdown) */}
                 <div className="flex flex-col sm:flex-row justify-between items-start gap-4 bg-white dark:bg-[#161923] p-5 rounded-3xl border border-slate-200 dark:border-[#333942] shadow-sm dark:shadow-lg dark:shadow-black/30 relative z-40">
                   <div className="mt-2">
@@ -3637,7 +3717,7 @@ export default function App() {
 
                 {/* Upload Area */}
                 <div className="w-full border-2 border-dashed border-slate-300 dark:border-[#444b55] rounded-[2rem] p-12 bg-white dark:bg-[#161923] hover:bg-slate-50 dark:hover:bg-[#1C1F29] hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors cursor-pointer group relative flex flex-col items-center text-center z-10">
-                  <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept=".pdf,.json,.txt,.md" />
+                  <input type="file" onChange={handleExamFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept=".pdf,.json,.txt,.md" />
                   <div className="mb-6 w-16 h-16 bg-slate-50 dark:bg-[#0B0E14] rounded-full flex items-center justify-center border border-slate-200 dark:border-[#333942] shadow-sm dark:shadow-md dark:shadow-black/40 group-hover:scale-110 transition-all duration-300">
                     <UploadCloud size={28} className="text-blue-500 dark:text-blue-400" />
                   </div>
@@ -3653,7 +3733,11 @@ export default function App() {
               </div>
 
               {/* Try Sample Data Button */}
-              <button className="mt-8 flex items-center gap-2 px-6 py-3 rounded-2xl border border-slate-200 dark:border-[#333942] bg-white/80 dark:bg-[#161923]/80 hover:bg-slate-50 dark:hover:bg-[#1C1F29] hover:border-slate-300 dark:hover:border-[#444b55] transition-colors text-slate-700 dark:text-slate-300 text-sm font-bold shadow-sm dark:shadow-lg dark:shadow-black/20">
+              <button onClick={() => {
+                const dummyText = `# Sample Exam\n\n1. Example question?\n(A) Option 1 (B) Option 2 (C) Option 3 (D) Option 4`;
+                const result = window.ExamParser.parseMarkdown(dummyText);
+                saveAndLaunchExam('Sample Exam.txt', result);
+              }} className="mt-8 flex items-center gap-2 px-6 py-3 rounded-2xl border border-slate-200 dark:border-[#333942] bg-white/80 dark:bg-[#161923]/80 hover:bg-slate-50 dark:hover:bg-[#1C1F29] hover:border-slate-300 dark:hover:border-[#444b55] transition-colors text-slate-700 dark:text-slate-300 text-sm font-bold shadow-sm dark:shadow-lg dark:shadow-black/20">
                 <Sparkles size={16} className="text-amber-500 dark:text-amber-400" /> Try with sample data
               </button>
 
@@ -3668,27 +3752,48 @@ export default function App() {
                   Saved Exams
                 </h3>
                 
-                <div className="bg-white/80 dark:bg-[#161923]/80 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-slate-300 dark:hover:border-[#444b55] transition-colors group gap-4">
-                  <div>
-                    <h4 className="font-bold text-slate-900 dark:text-white text-[15px] mb-2">JEE - Rank Booster TEST SERIES</h4>
-                    <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
-                      <span className="text-orange-600 dark:text-orange-400">JEE Main</span>
-                      <span>75 Qs</span>
-                      <span>3 Apr 2026 10:49 am</span>
-                    </div>
+                {savedExams.length === 0 ? (
+                  <div className="p-10 text-center bg-slate-50/50 dark:bg-white/5 rounded-3xl border border-dashed border-slate-200 dark:border-white/10 text-slate-400 font-bold text-sm">
+                    No saved exams yet. Upload a paper to get started!
                   </div>
-                  <div className="flex items-center gap-3 w-full md:w-auto">
-                    <button className="flex-1 md:flex-none bg-slate-50 dark:bg-[#1C1F29] border border-slate-200 dark:border-[#444b55] hover:border-blue-400 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-[#22262e] text-slate-700 dark:text-slate-300 px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm">
-                      Load
-                    </button>
-                    <button className="bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 hover:bg-rose-100 dark:hover:bg-rose-500/20 hover:border-rose-200 dark:hover:border-rose-500/30 text-rose-600 dark:text-rose-400 p-2.5 rounded-xl transition-all">
-                      <X size={18} strokeWidth={2.5} />
-                    </button>
+                ) : (
+                  <div className="space-y-4">
+                    {savedExams.map(ex => (
+                      <div key={ex.id} className="bg-white/80 dark:bg-[#161923]/80 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-slate-300 dark:hover:border-[#444b55] transition-colors group gap-4">
+                        <div>
+                          <h4 className="font-bold text-slate-900 dark:text-white text-[15px] mb-2">{ex.name}</h4>
+                          <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+                            <span className="text-orange-600 dark:text-orange-400 capitalize">{ex.template}</span>
+                            <span>{ex.questionCount} Qs</span>
+                            <span>{new Date(ex.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                          <button 
+                            onClick={() => window.open(`/exam-portal/index.html?id=${ex.id}`, '_blank')}
+                            className="flex-1 md:flex-none bg-slate-50 dark:bg-[#1C1F29] border border-slate-200 dark:border-[#444b55] hover:border-blue-400 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-[#22262e] text-slate-700 dark:text-slate-300 px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm"
+                          >
+                            Load
+                          </button>
+                          <button 
+                            onClick={async () => {
+                              if(window.confirm('Delete this saved exam?')) {
+                                await window.ExamStore.deleteExam(ex.id);
+                                setSavedExams(await window.ExamStore.listExams());
+                              }
+                            }}
+                            className="bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 hover:bg-rose-100 dark:hover:bg-rose-500/20 hover:border-rose-200 dark:hover:border-rose-500/30 text-rose-600 dark:text-rose-400 p-2.5 rounded-xl transition-all"
+                          >
+                            <X size={18} strokeWidth={2.5} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
+                )}
               </div>
             </div>
-          )}}
+          )}
 
           {activeTab === 'Notes' && (
             <div className="animate-in fade-in duration-500">

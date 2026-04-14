@@ -87,6 +87,16 @@
     bindTemplateEvents();
     bindFontZoomEvents();
     renderSavedExams();
+
+    // Check for auto-load ID in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const autoLoadId = urlParams.get('id');
+    if (autoLoadId && typeof ExamStore !== 'undefined') {
+      console.log('[App] Auto-loading exam ID:', autoLoadId);
+      loadSavedExam(parseInt(autoLoadId, 10));
+      // Remove the id from URL to keep it clean (optional)
+      // window.history.replaceState({}, '', window.location.pathname);
+    }
   }
 
   // ================================

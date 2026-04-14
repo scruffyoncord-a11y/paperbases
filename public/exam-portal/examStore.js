@@ -98,5 +98,7 @@ const ExamStore = (function () {
     });
   }
 
-  return { saveExam, listExams, loadExam, deleteExam };
+  const store = { saveExam, listExams, loadExam, deleteExam };
+  if (typeof window !== 'undefined') window.ExamStore = store;
+  return store;
 })();

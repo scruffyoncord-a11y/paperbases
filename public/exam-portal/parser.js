@@ -214,6 +214,8 @@ const ExamParser = (function () {
       console.log('[Parser] Q1 options:', questions[0].options.map(o => o.text.substring(0, 30)));
     }
 
+    const parser = { parse, parseMarkdown };
+    if (typeof window !== 'undefined') window.ExamParser = parser;
     return { title, questions, subjects, imageMap };
   }
 
@@ -1603,5 +1605,7 @@ const ExamParser = (function () {
     };
   }
 
-  return { parse, parseMarkdown, resyncQuestion };
+  const parser = { parse, parseMarkdown, resyncQuestion };
+  if (typeof window !== 'undefined') window.ExamParser = parser;
+  return parser;
 })();
