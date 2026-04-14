@@ -2957,8 +2957,8 @@ export default function App() {
             </div>
             <button onClick={() => setShowAskDoubtModal(true)} className="flex-1 text-left bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl px-5 py-2.5 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">Create Post</button>
             <div className="flex gap-2">
-              <button onClick={() => setShowAskDoubtModal(true)} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"><Image size={20} /></button>
-              <button onClick={() => setShowAskDoubtModal(true)} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"><Link size={20} /></button>
+              <button onClick={() => setShowAskDoubtModal(true)} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"><ImageIcon size={20} /></button>
+              <button onClick={() => setShowAskDoubtModal(true)} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"><LinkIcon size={20} /></button>
             </div>
           </div>
 
@@ -4545,7 +4545,6 @@ export default function App() {
         </div>
       )}
 
-      {/* Policy Acceptance Modal */}
       <PolicyAcceptanceModal 
         isOpen={showPolicyModal} 
         onAccept={handleAcceptPolicies} 
@@ -4555,6 +4554,8 @@ export default function App() {
           if(activeTab === 'Resources') setActiveTab('Home');
         }} 
       />
+
+      {showProfileModal && <ProfileOnboardingModal />}
     </div>
   );
 }
