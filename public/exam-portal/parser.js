@@ -1603,7 +1603,5 @@ const ExamParser = (function () {
     };
   }
 
-  const parser = { parse, parseMarkdown, resyncQuestion };
-  if (typeof window !== 'undefined') window.ExamParser = parser;
-  return parser;
+  return { parse, parseMarkdown, resyncQuestion };
 })();
