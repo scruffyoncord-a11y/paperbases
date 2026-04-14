@@ -1928,6 +1928,8 @@ export default function App() {
   const [examProcessingStatus, setExamProcessingStatus] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
+  const fileInputRef = React.useRef(null);
+  const [examSearchQuery, setExamSearchQuery] = useState('');
   const [selectedExamForPYQ, setSelectedExamForPYQ] = useState(null);
   const [pyqSubject, setPyqSubject] = useState('Physics');
   const [selectedDay, setSelectedDay] = useState(new Intl.DateTimeFormat('en-US', { weekday: 'short' }).format(new Date()));
@@ -3610,6 +3612,8 @@ export default function App() {
                     <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
                     <input 
                       type="text" 
+                      value={examSearchQuery}
+                      onChange={(e) => setExamSearchQuery(e.target.value)}
                       placeholder="Find a specific mock test or DPP..." 
                       className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600"
                     />
@@ -3622,7 +3626,11 @@ export default function App() {
                       { name: 'NEET Practice', count: '30 Papers', color: 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-500/20' },
                       { name: 'Chapter DPPs', count: '150+ Sets', color: 'bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-200 dark:border-purple-500/20' },
                     ].map((category, idx) => (
-                      <div key={idx} className={`p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-md hover:-translate-y-0.5 hover:opacity-80 ${category.color}`}>
+                      <div 
+                        key={idx} 
+                        onClick={() => setExamSearchQuery(category.name)}
+                        className={`p-4 rounded-2xl border transition-all cursor-pointer hover:shadow-md hover:-translate-y-0.5 hover:opacity-80 active:scale-95 ${category.color}`}
+                      >
                         <h4 className="font-bold text-xs mb-1 text-slate-900 dark:text-white">{category.name}</h4>
                         <p className="text-[10px] font-medium">{category.count}</p>
                       </div>
@@ -3716,14 +3724,23 @@ export default function App() {
                 </div>
 
                 {/* Upload Area */}
-                <div className="w-full border-2 border-dashed border-slate-300 dark:border-[#444b55] rounded-[2rem] p-12 bg-white dark:bg-[#161923] hover:bg-slate-50 dark:hover:bg-[#1C1F29] hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors cursor-pointer group relative flex flex-col items-center text-center z-10">
-                  <input type="file" onChange={handleExamFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept=".pdf,.json,.txt,.md" />
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full border-2 border-dashed border-slate-300 dark:border-[#444b55] rounded-[2rem] p-12 bg-white dark:bg-[#161923] hover:bg-slate-50 dark:hover:bg-[#1C1F29] hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors cursor-pointer group relative flex flex-col items-center text-center z-10"
+                >
+                  <input 
+                    type="file" 
+                    ref={fileInputRef}
+                    onChange={handleExamFileUpload} 
+                    className="hidden" 
+                    accept=".pdf,.json,.txt,.md" 
+                  />
                   <div className="mb-6 w-16 h-16 bg-slate-50 dark:bg-[#0B0E14] rounded-full flex items-center justify-center border border-slate-200 dark:border-[#333942] shadow-sm dark:shadow-md dark:shadow-black/40 group-hover:scale-110 transition-all duration-300">
                     <UploadCloud size={28} className="text-blue-500 dark:text-blue-400" />
                   </div>
                   <h3 className="text-slate-900 dark:text-white font-bold text-xl mb-3 tracking-tight">Drag & drop your PDF or JSON file here</h3>
                   <p className="text-slate-500 text-sm mb-6">or</p>
-                  <button className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-[0_4px_15px_rgba(37,99,235,0.2)] dark:shadow-[0_0_15px_rgba(37,99,235,0.3)] group-hover:bg-blue-700 dark:group-hover:bg-blue-500 group-hover:shadow-[0_6px_20px_rgba(37,99,235,0.3)] dark:group-hover:shadow-[0_0_25px_rgba(37,99,235,0.5)] transition-all pointer-events-none mb-6">
+                  <button className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-[0_4px_15px_rgba(37,99,235,0.2)] dark:shadow-[0_0_15px_rgba(37,99,235,0.3)] group-hover:bg-blue-700 dark:group-hover:bg-blue-500 group-hover:shadow-[0_6px_20px_rgba(37,99,235,0.3)] dark:group-hover:shadow-[0_0_25px_rgba(37,99,235,0.5)] transition-all mb-6">
                     Browse Files
                   </button>
                   <p className="text-[12px] font-medium text-slate-500">
