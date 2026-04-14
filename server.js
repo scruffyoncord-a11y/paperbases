@@ -147,7 +147,11 @@ app.post('/api/auth/google', async (req, res) => {
         await initializeSyllabus(user.id);
     }
 
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points, policiesAccepted: user.policiesAccepted } });
+    res.json({ success: true, user: { 
+      id: user.id, email: user.email, name: user.name, picture: user.picture, 
+      points: user.points, policiesAccepted: user.policiesAccepted,
+      profession: user.profession, grade: user.grade, experience: user.experience
+    } });
   } catch (error) {
     console.error('Error handling Google login:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -178,7 +182,11 @@ app.post('/api/auth/signup', async (req, res) => {
 
     await initializeSyllabus(user.id);
 
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points, policiesAccepted: user.policiesAccepted } });
+    res.json({ success: true, user: { 
+      id: user.id, email: user.email, name: user.name, picture: user.picture, 
+      points: user.points, policiesAccepted: user.policiesAccepted,
+      profession: user.profession, grade: user.grade, experience: user.experience
+    } });
   } catch (error) {
     console.error('Signup error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -207,7 +215,11 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(400).json({ success: false, message: 'Invalid credentials' });
     }
 
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points, policiesAccepted: user.policiesAccepted } });
+    res.json({ success: true, user: { 
+      id: user.id, email: user.email, name: user.name, picture: user.picture, 
+      points: user.points, policiesAccepted: user.policiesAccepted,
+      profession: user.profession, grade: user.grade, experience: user.experience
+    } });
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -226,7 +238,11 @@ app.get('/api/auth/validate/:userId', async (req, res) => {
     if (!user) {
       return res.json({ success: false, message: 'User not found' });
     }
-    res.json({ success: true, user: { id: user.id, email: user.email, name: user.name, picture: user.picture, points: user.points, policiesAccepted: user.policiesAccepted } });
+    res.json({ success: true, user: { 
+      id: user.id, email: user.email, name: user.name, picture: user.picture, 
+      points: user.points, policiesAccepted: user.policiesAccepted,
+      profession: user.profession, grade: user.grade, experience: user.experience
+    } });
   } catch (error) {
     console.error('Error validating user:', error);
     res.status(500).json({ success: false, message: 'Server error' });
@@ -243,9 +259,27 @@ app.post('/api/user/accept-policies', async (req, res) => {
       where: { id: parseInt(userId, 10) },
       data: { policiesAccepted: true }
     });
-    res.json({ success: true, policiesAccepted: user.policiesAccepted });
+    res.status(500).json({ success: false, message: 'Server error' });
+  }
+});
+
+// Update user profile fields
+app.post('/api/user/profile', async (req, res) => {
+  const { userId, profession, grade, experience } = req.body;
+  if (!userId) return res.status(400).json({ success: false, message: 'Missing userId' });
+
+  try {
+    const user = await prisma.user.update({
+      where: { id: parseInt(userId, 10) },
+      data: { profession, grade, experience }
+    });
+    res.json({ success: true, user: { 
+      id: user.id, email: user.email, name: user.name, picture: user.picture, 
+      points: user.points, policiesAccepted: user.policiesAccepted,
+      profession: user.profession, grade: user.grade, experience: user.experience
+    } });
   } catch (error) {
-    console.error('Error accepting policies:', error);
+    console.error('Error updating profile:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
@@ -341,7 +375,7 @@ app.get('/api/doubts', async (req, res) => {
         status: true,
         createdAt: true,
         updatedAt: true,
-        user: { select: { id: true, name: true, picture: true } },
+        user: { select: { id: true, name: true, picture: true, profession: true, grade: true, experience: true } },
         _count: { select: { replies: true } }
       },
       orderBy: { createdAt: 'desc' }
@@ -360,9 +394,9 @@ app.get('/api/doubts/:id', async (req, res) => {
     const doubt = await prisma.doubt.findUnique({
       where: { id: doubtId },
       include: {
-        user: { select: { id: true, name: true, picture: true } },
+        user: { select: { id: true, name: true, picture: true, profession: true, grade: true, experience: true } },
         replies: {
-          include: { user: { select: { id: true, name: true, picture: true } } },
+          include: { user: { select: { id: true, name: true, picture: true, profession: true, grade: true, experience: true } } },
           orderBy: { createdAt: 'asc' }
         }
       }
@@ -402,7 +436,7 @@ app.post('/api/doubts', async (req, res) => {
         imageUrl: imageUrl || null
       },
       include: {
-        user: { select: { id: true, name: true, picture: true } },
+        user: { select: { id: true, name: true, picture: true, profession: true, grade: true, experience: true } },
         _count: { select: { replies: true } }
       }
     });
@@ -450,7 +484,7 @@ app.post('/api/doubts/:id/reply', async (req, res) => {
         content
       },
       include: {
-        user: { select: { id: true, name: true, picture: true } }
+        user: { select: { id: true, name: true, picture: true, profession: true, grade: true, experience: true } }
       }
     });
     res.json({ success: true, reply });
@@ -491,7 +525,7 @@ app.get('/api/resources', async (req, res) => {
       where,
       select: {
           id: true, title: true, description: true, subject: true, tag: true, fileType: true, fileUrl: true, userId: true, createdAt: true,
-          user: { select: { id: true, name: true, picture: true } },
+          user: { select: { id: true, name: true, picture: true, profession: true, grade: true, experience: true } },
           _count: { select: { likes: true, dislikes: true } },
           likes: { select: { userId: true } },
           dislikes: { select: { userId: true } }
@@ -511,7 +545,7 @@ app.get('/api/resources/:id', async (req, res) => {
     const resource = await prisma.resource.findUnique({
       where: { id: parseInt(req.params.id, 10) },
       include: {
-        user: { select: { id: true, name: true, picture: true } },
+        user: { select: { id: true, name: true, picture: true, profession: true, grade: true, experience: true } },
         _count: { select: { likes: true, dislikes: true, reports: true } },
         likes: { select: { userId: true } },
         dislikes: { select: { userId: true } }
@@ -570,7 +604,7 @@ app.post('/api/resources', async (req, res) => {
         textContent: textContent // Save text for PaperAI too
       },
       include: {
-        user: { select: { id: true, name: true, picture: true } },
+        user: { select: { id: true, name: true, picture: true, profession: true, grade: true, experience: true } },
         _count: { select: { likes: true, dislikes: true } },
         likes: { select: { userId: true } },
         dislikes: { select: { userId: true } }

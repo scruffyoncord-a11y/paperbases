@@ -73,7 +73,10 @@ import {
   PlayCircle,
   Tv,
   MonitorPlay,
-  Save
+  Save,
+  ChevronUp,
+  Link as LinkIcon,
+  UserCircle
 } from 'lucide-react';
 import { GlobalWorkerOptions, getDocument as pdfjsGetDocument } from "pdfjs-dist";
 import { PolicyAcceptanceModal } from './Policies';
@@ -2006,6 +2009,126 @@ export default function App() {
     keam: ['Maths', 'Physics', 'Chemistry']
   }), []);
 
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [profileForm, setProfileForm] = useState({ profession: '', grade: '', experience: '' });
+  const [isSubmittingProfile, setIsSubmittingProfile] = useState(false);
+
+  // Trigger profile modal if opening doubts/community and profession is missing
+  useEffect(() => {
+    if ((activeTab === 'Community' || activeTab === 'Doubts') && user && !user.profession) {
+      setShowProfileModal(true);
+    }
+  }, [activeTab, user]);
+
+  const handleProfileSubmit = async (e) => {
+    e.preventDefault();
+    if (!profileForm.profession) return;
+    setIsSubmittingProfile(true);
+    try {
+      const res = await fetch('/api/user/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, ...profileForm })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUser(data.user);
+        const savedUser = JSON.parse(localStorage.getItem('user'));
+        localStorage.setItem('user', JSON.stringify({ ...savedUser, ...data.user }));
+        setShowProfileModal(false);
+      }
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsSubmittingProfile(false);
+    }
+  };
+
+  const UserBadge = ({ u }) => {
+    if (!u || !u.profession) return null;
+    const badgeText = u.profession === 'Student' ? u.grade : `${u.experience.split(' ')[0]} Exp`;
+    return (
+      <span className={`text-[9px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider ml-1.5 inline-flex items-center gap-1 ${u.profession === 'Teacher' ? 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-400 border border-amber-200 dark:border-amber-500/20' : 'bg-blue-100 text-blue-700 dark:bg-blue-500/10 dark:text-blue-400 border border-blue-200 dark:border-blue-500/20'}`}>
+        {u.profession === 'Teacher' && <Award size={10} />}
+        {u.profession === 'Student' && <GraduationCap size={10} />}
+        {badgeText}
+      </span>
+    );
+  };
+
+  const ProfileOnboardingModal = () => (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-300">
+      <div className="bg-white dark:bg-[#161923] w-full max-w-md rounded-[2.5rem] border border-slate-200 dark:border-white/10 p-8 shadow-2xl scale-in-center overflow-hidden relative">
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-blue-500/10 rounded-full blur-3xl"></div>
+        <div className="relative z-10">
+          <div className="w-16 h-16 bg-blue-50 dark:bg-blue-500/10 rounded-3xl flex items-center justify-center mb-6 border border-blue-100 dark:border-blue-500/20">
+            <UserCircle size={32} className="text-blue-600 dark:text-blue-400" />
+          </div>
+          <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-2">Welcome to Phase 2!</h2>
+          <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">Quickly verify your profile to start interacting in the community.</p>
+          
+          <form onSubmit={handleProfileSubmit} className="space-y-6">
+            <div className="space-y-3">
+              <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">I am a...</label>
+              <div className="grid grid-cols-2 gap-3">
+                {['Student', 'Teacher'].map(p => (
+                  <button 
+                    key={p} type="button" 
+                    onClick={() => setProfileForm({ ...profileForm, profession: p, grade: '', experience: '' })}
+                    className={`p-4 rounded-2xl border font-bold transition-all ${profileForm.profession === p ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-slate-50 dark:bg-white/5 border-slate-200 dark:border-white/5 text-slate-600 dark:text-slate-400'}`}
+                  >
+                    {p === 'Student' ? <div className="flex flex-col items-center gap-2"><GraduationCap /> Student</div> : <div className="flex flex-col items-center gap-2"><Award /> Teacher</div>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {profileForm.profession === 'Student' && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Current Grade / Status</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {['11th', '12th', 'Dropper'].map(g => (
+                    <button 
+                      key={g} type="button" 
+                      onClick={() => setProfileForm({ ...profileForm, grade: g })}
+                      className={`py-2.5 rounded-xl border text-xs font-bold transition-all ${profileForm.grade === g ? 'bg-blue-500 border-blue-500 text-white' : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/5 text-slate-500'}`}
+                    >
+                      {g}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {profileForm.profession === 'Teacher' && (
+              <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 px-1">Teaching Experience</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['0-5 years', '5-10 years', '10-20 years', '20+ years'].map(e => (
+                    <button 
+                      key={e} type="button" 
+                      onClick={() => setProfileForm({ ...profileForm, experience: e })}
+                      className={`py-2.5 rounded-xl border text-[10px] font-bold transition-all ${profileForm.experience === e ? 'bg-amber-500 border-amber-500 text-white' : 'bg-white dark:bg-white/5 border-slate-200 dark:border-white/5 text-slate-500'}`}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <button 
+              disabled={isSubmittingProfile || !profileForm.profession || (profileForm.profession === 'Student' && !profileForm.grade) || (profileForm.profession === 'Teacher' && !profileForm.experience)}
+              className="w-full py-4 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl hover:scale-[1.02] active:scale-95 transition-all disabled:opacity-50 disabled:scale-100"
+            >
+              {isSubmittingProfile ? 'Saving...' : 'Get My Community Badge'}
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+
   useEffect(() => {
     const available = modeSubjects[syllabusMode];
     if (!available.includes(activeSubject)) {
@@ -2825,59 +2948,135 @@ export default function App() {
 
   const CommunityView = () => (
     <section className="animate-in fade-in duration-500">
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-3xl p-6 shadow-sm dark:shadow-lg dark:shadow-black/20">
-            <div className="flex items-center gap-4 mb-6">
-              <div className="w-10 h-10 rounded-full bg-blue-50 dark:bg-blue-500/10 flex items-center justify-center text-blue-600 dark:text-blue-500 border border-blue-100 dark:border-blue-500/20">
-                  {user?.picture ? <img src={user.picture} className="w-full h-full rounded-full" /> : <User size={20} />}
-              </div>
-              <button onClick={() => setShowAskDoubtModal(true)} className="flex-1 text-left bg-slate-50 dark:bg-[#0B0E14]/80 border border-slate-200 dark:border-[#333942] rounded-2xl px-5 py-3 text-sm text-slate-500 hover:bg-slate-100 transition-colors">Ask a doubt or share a resource...</button>
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+        <div className="lg:col-span-3 space-y-4">
+          {/* Post Creation (Reddit Style Top Bar) */}
+          <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-2xl p-4 flex items-center gap-4 shadow-sm">
+            <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-white/10 flex items-center justify-center shrink-0">
+                {user?.picture ? <img src={user.picture} className="w-full h-full rounded-full" /> : <User size={20} className="text-slate-400" />}
             </div>
-            <div className="flex gap-4 border-t border-slate-100 dark:border-[#444b55] pt-4">
-              <button onClick={() => setShowAskDoubtModal(true)} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><FileText size={16} /> Question</button>
-              <button onClick={() => {setActiveTab('Resources'); setShowUploadModal(true);}} className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors"><Book size={16} /> Resource</button>
-              <button className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-amber-600 dark:hover:text-amber-400 transition-colors"><Star size={16} /> Achievement</button>
+            <button onClick={() => setShowAskDoubtModal(true)} className="flex-1 text-left bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-xl px-5 py-2.5 text-sm text-slate-500 hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">Create Post</button>
+            <div className="flex gap-2">
+              <button onClick={() => setShowAskDoubtModal(true)} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"><Image size={20} /></button>
+              <button onClick={() => setShowAskDoubtModal(true)} className="w-10 h-10 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 dark:hover:bg-white/5"><Link size={20} /></button>
             </div>
           </div>
+
+          <div className="flex bg-white/40 dark:bg-white/5 rounded-xl border border-slate-200 dark:border-white/5 p-1 mb-4 w-fit">
+            {['All', 'Unanswered', 'Resolved'].map(filter => (
+               <button 
+                key={filter} 
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${activeFilter === filter ? 'bg-white dark:bg-white/10 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                onClick={() => setActiveFilter(filter)}
+               >
+                 {filter}
+               </button>
+            ))}
+          </div>
+
           {doubts.length === 0 ? (
-            <div className="py-12 text-center text-slate-500">
-                <MessageSquare size={48} className="mx-auto mb-4 opacity-20" />
-                <p>No doubts yet. Be the first to ask!</p>
+            <div className="py-20 text-center text-slate-500">
+                <MessageSquare size={48} className="mx-auto mb-4 opacity-10" />
+                <p className="font-bold text-lg">No posts yet</p>
+                <p className="text-sm opacity-60">Be the first to start a conversation in this community.</p>
             </div>
           ) : doubts.map((post) => (
-            <div key={post.id} onClick={(e) => { if(!e.target.closest('button')) setSelectedDoubt(post); }} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-3xl p-6 shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-blue-400 dark:hover:border-blue-500/30 transition-all cursor-pointer">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-full bg-slate-100 dark:bg-[#2d323c]/70 flex items-center justify-center text-slate-400 border border-transparent dark:border-[#444b55]">
-                      {post.user.picture ? <img src={post.user.picture} className="w-full h-full rounded-full" /> : <User size={20} />}
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-slate-900 dark:text-white text-sm">{post.user.name}</span>
-                      {post.status === 'Resolved' && <span className="text-[10px] bg-emerald-100 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400 border border-transparent dark:border-emerald-500/20 px-2 py-0.5 rounded font-bold uppercase tracking-tight">Resolved</span>}
+            <article key={post.id} onClick={(e) => { if(!e.target.closest('button')) setSelectedDoubt(post); }} className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-2xl flex hover:border-slate-400 dark:hover:border-blue-500/30 transition-all cursor-pointer group shadow-sm overflow-hidden">
+               {/* Vote Sidebar */}
+               <div className="w-10 sm:w-12 bg-slate-50/50 dark:bg-black/10 flex flex-col items-center py-4 gap-1 border-r border-slate-100 dark:border-white/5">
+                 <button className="text-slate-400 hover:text-orange-500 transition-colors"><ChevronUp size={24} /></button>
+                 <span className="text-xs font-black text-slate-700 dark:text-slate-200">{post._count?.replies || 0}</span>
+                 <button className="text-slate-400 hover:text-blue-500 transition-colors"><ChevronDown size={24} /></button>
+               </div>
+
+               {/* Post Content */}
+               <div className="flex-1 p-4 pb-3">
+                 <div className="flex items-center gap-2 mb-2">
+                   <div className="w-6 h-6 rounded-full bg-slate-200 dark:bg-white/10 flex items-center justify-center overflow-hidden">
+                      {post.user.picture ? <img src={post.user.picture} className="w-full h-full object-cover" /> : <User size={12} className="text-slate-400" />}
+                   </div>
+                   <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-black text-slate-900 dark:text-white">{post.user.name}</span>
+                      <UserBadge u={post.user} />
+                      <span className="text-[11px] text-slate-400">• {timeAgo(post.createdAt)}</span>
+                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ml-2 uppercase tracking-tighter ${getSubjectColor(post.subject)}`}>r/{post.subject}</span>
+                   </div>
+                 </div>
+
+                 <h2 className="text-lg font-black text-slate-900 dark:text-white mb-2 leading-tight group-hover:underline">{post.title}</h2>
+                 <p className="text-sm text-slate-500 dark:text-slate-400 mb-4 line-clamp-3 leading-relaxed">{post.content}</p>
+                 
+                 {post.imageUrl && (
+                    <div className="mb-4 rounded-xl overflow-hidden border border-slate-200 dark:border-white/5 max-h-[400px]">
+                        <img src={post.imageUrl} className="w-full h-full object-contain bg-black/5" />
                     </div>
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{timeAgo(post.createdAt)}</span>
-                  </div>
-                </div>
-                <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${getSubjectColor(post.subject)}`}>{post.subject}</span>
-              </div>
-              <h3 className="font-black text-slate-900 dark:text-white mb-2 leading-snug">{post.title}</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 line-clamp-2">{post.content}</p>
-              {post.imageUrl && (
-                  <div className="mb-6 rounded-xl overflow-hidden border border-slate-200 dark:border-white/10 max-h-60">
-                      <img src={post.imageUrl} className="w-full object-cover" />
-                  </div>
-              )}
-              <div className="flex items-center gap-6 pt-4 border-t border-slate-100 dark:border-[#444b55]">
-                <button className="flex items-center gap-2 text-xs font-bold text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors"><MessageCircle size={16} /> {post._count?.replies || 0} Replies</button>
-                {post.status === 'Resolved' && <span className="flex items-center gap-2 text-xs font-bold text-emerald-500"><CheckCircle2 size={16} /> Marked as solved</span>}
-                {user?.id === post.userId && <button onClick={() => handleDeleteDoubt(post.id)} className="ml-auto text-slate-400 hover:text-rose-500 transition-colors"><Trash2 size={16} /></button>}
-              </div>
-            </div>
+                 )}
+
+                 <div className="flex items-center gap-4 text-xs font-bold text-slate-400">
+                   <div className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                     <MessageCircle size={16} /> {post._count?.replies || 0} Comments
+                   </div>
+                   <button className="flex items-center gap-1.5 px-2 py-1.5 rounded hover:bg-slate-100 dark:hover:bg-white/5 transition-colors">
+                     <Share2 size={16} /> Share
+                   </button>
+                   {post.status === 'Resolved' && (
+                     <div className="flex items-center gap-1.5 text-emerald-500 ml-auto">
+                        <CheckCircle2 size={16} /> <span className="text-[10px] uppercase tracking-widest">Solved</span>
+                     </div>
+                   )}
+                   {user?.id === post.userId && (
+                     <button onClick={(e) => { e.stopPropagation(); handleDeleteDoubt(post.id); }} className="p-2 text-slate-300 hover:text-rose-500 transition-colors ml-auto">
+                        <Trash2 size={16} />
+                     </button>
+                   )}
+                 </div>
+               </div>
+            </article>
           ))}
         </div>
-        <div className="space-y-6">
+
+        {/* Sidebar Information */}
+        <div className="space-y-6 hidden lg:block">
+          <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-2xl shadow-sm overflow-hidden">
+             <div className="h-10 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
+             <div className="p-4 pt-2">
+                <div className="flex items-center gap-3 mb-4">
+                   <div className="w-14 h-14 rounded-2xl bg-white dark:bg-[#0B0E14] border-2 border-white dark:border-[#161923] -mt-10 shadow-lg flex items-center justify-center">
+                      <img src="/logo.png" className="w-10 h-10 object-contain" />
+                   </div>
+                   <h3 className="font-black text-sm text-slate-900 dark:text-white mt-1">r/PeakPrep_Community</h3>
+                </div>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed">
+                   The official community for JEE, NEET, and BITSAT aspirants. Discuss questions, share resources, and help each other grow.
+                </p>
+                <div className="grid grid-cols-2 gap-4 mb-6 pt-4 border-t border-slate-100 dark:border-white/5">
+                   <div>
+                      <div className="text-sm font-black text-slate-900 dark:text-white">12.4k</div>
+                      <div className="text-[10px] uppercase tracking-widest text-slate-400">Members</div>
+                   </div>
+                   <div>
+                      <div className="text-sm font-black text-slate-900 dark:text-white">45</div>
+                      <div className="text-[10px] uppercase tracking-widest text-slate-400">Online</div>
+                   </div>
+                </div>
+                <button onClick={() => setShowAskDoubtModal(true)} className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-md active:scale-95">Create Post</button>
+             </div>
+          </div>
+
+          <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-2xl p-4 shadow-sm">
+             <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4">Rules & Conduct</h3>
+             <ul className="space-y-3">
+                {['Be respectful', 'No spam', 'Stay on topic', 'Search before posting'].map((rule, i) => (
+                  <li key={i} className="flex items-center gap-3 text-xs font-bold text-slate-700 dark:text-slate-300 border-b border-slate-50 dark:border-white/5 pb-2 last:border-0">
+                    <span className="text-blue-500">{i + 1}.</span> {rule}
+                  </li>
+                ))}
+             </ul>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
           <div className="bg-slate-800 dark:bg-[#2d323c]/70 backdrop-blur-xl border border-slate-700 dark:border-[#444b55] rounded-3xl p-6 text-white shadow-xl">
             <h3 className="text-lg font-black mb-4 flex items-center gap-2 text-white"><Trophy size={20} className="text-amber-400" /> Hall of Fame</h3>
             <div className="space-y-4">

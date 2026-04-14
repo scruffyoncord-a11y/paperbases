@@ -19,6 +19,9 @@ model User {
   focusTime Int        @default(0) // minutes
   points    Int        @default(0) // gamification points for resources
   policiesAccepted Boolean @default(false)
+  profession      String?   // "Student" or "Teacher"
+  grade           String?   // "11th", "12th", "Dropper" (for students)
+  experience      String?   // "0-5 years", "5-10 years", etc. (for teachers)
   progress  Progress[]
   doubts    Doubt[]
   replies   Reply[]
