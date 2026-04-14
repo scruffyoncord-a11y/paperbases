@@ -1605,3 +1605,10 @@ const ExamParser = (function () {
 
   return { parse, parseMarkdown, resyncQuestion };
 })();
+
+if (typeof window !== 'undefined') {
+  window.ExamParser = ExamParser;
+}
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = ExamParser;
+}
