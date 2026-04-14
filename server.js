@@ -1457,7 +1457,9 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-const PORT = process.env.PORT || 8080; // Railway uses 8080 by default often, or PORT env
-app.listen(PORT, () => {
+const PORT = process.env.PORT || 8080;
+const server = app.listen(PORT, () => {
   console.log(`Server listening on port ${PORT}`);
 });
+server.timeout = 120000;
+

@@ -2275,7 +2275,16 @@ export default function App() {
       if (testsSubTab === 'My Uploads') {
         const res = await fetch(`/api/exams/user/${user.id}`);
         const data = await res.json();
-        setSavedExams(data.exams || []);
+        const dbExams = data.exams || [];
+        
+        let localExams = [];
+        if (window.ExamStore) {
+            localExams = await window.ExamStore.listExams();
+            // Prefix local IDs or normalize them so they don't clash
+            localExams = localExams.map(e => ({ ...e, isLocal: true, id: `local-${e.id}` }));
+        }
+        
+        setSavedExams([...dbExams, ...localExams]);
       } else if (testsSubTab === 'Browse') {
         const res = await fetch(`/api/exams?query=${encodeURIComponent(examSearchQuery)}`);
         const data = await res.json();
@@ -3861,22 +3870,35 @@ export default function App() {
                               </div>
                            </div>
                            <div className="flex items-center gap-3 w-full md:w-auto">
-                              <button 
-                                onClick={async () => {
-                                  await fetch(`/api/exams/${ex.id}/download`, { method: 'POST' });
-                                  window.open(`/exam-portal/index.html?dbid=${ex.id}`, '_blank');
-                                  if(testsSubTab === 'Trending') fetchExams();
-                                }}
-                                className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
-                              >
-                                {testsSubTab === 'My Uploads' ? 'Launch' : 'Take Exam'}
-                              </button>
+                               <button 
+                                 onClick={async () => {
+                                   if (ex.isLocal) {
+                                     const actualId = String(ex.id).replace('local-', '');
+                                     window.open(`/exam-portal/index.html?id=${actualId}`, '_blank');
+                                   } else {
+                                     await fetch(`/api/exams/${ex.id}/download`, { method: 'POST' });
+                                     window.open(`/exam-portal/index.html?dbid=${ex.id}`, '_blank');
+                                     if(testsSubTab === 'Trending') fetchExams();
+                                   }
+                                 }}
+                                 className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-8 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-lg active:scale-95"
+                               >
+                                 {testsSubTab === 'My Uploads' ? 'Launch' : 'Take Exam'}
+                               </button>
                               {testsSubTab === 'My Uploads' && (
                                 <button 
                                   onClick={async () => {
                                     if(window.confirm('Are you sure you want to delete this exam permanently?')) {
-                                      await fetch(`/api/exams/${ex.id}`, { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: user.id}) });
-                                      fetchExams();
+                                      if (ex.isLocal) {
+                                        const actualId = String(ex.id).replace('local-', '');
+                                        if (window.ExamStore) {
+                                          await window.ExamStore.deleteExam(parseInt(actualId));
+                                          fetchExams();
+                                        }
+                                      } else {
+                                        await fetch(`/api/exams/${ex.id}`, { method: 'DELETE', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({userId: user.id}) });
+                                        fetchExams();
+                                      }
                                     }
                                   }}
                                   className="w-12 h-12 rounded-2xl bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 text-rose-500 flex items-center justify-center hover:bg-rose-500 hover:text-white transition-all active:scale-95"
