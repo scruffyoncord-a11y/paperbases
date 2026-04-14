@@ -259,6 +259,9 @@ app.post('/api/user/accept-policies', async (req, res) => {
       where: { id: parseInt(userId, 10) },
       data: { policiesAccepted: true }
     });
+    res.json({ success: true, policiesAccepted: user.policiesAccepted });
+  } catch (error) {
+    console.error('Error accepting policies:', error);
     res.status(500).json({ success: false, message: 'Server error' });
   }
 });
