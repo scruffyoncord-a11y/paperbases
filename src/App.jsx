@@ -1923,7 +1923,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('Home');
   const [homeTab, setHomeTab] = useState('All');
   const [resourceTab, setResourceTab] = useState('Quick Access');
-  const [doubtTab, setDoubtTab] = useState('All');
+  const [activeFilter, setActiveFilter] = useState('All');
   const [examTemplate, setExamTemplate] = useState('custom');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [savedExams, setSavedExams] = useState([]);
