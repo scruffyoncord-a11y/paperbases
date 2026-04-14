@@ -11,6 +11,33 @@ import { extractTextFromPdf } from './server/pdf_service.js';
 import multer from 'multer';
 import axios from 'axios';
 import FormData from 'form-data';
+import fs from 'fs';
+import { promisify } from 'util';
+
+const sleep = promisify(setTimeout);
+const PADDLE_JOB_URL = "https://paddleocr.aistudio-app.com/api/v2/ocr/jobs";
+const PADDLE_TOKEN = "101b45aead046b960dfc4e4e83191812bccb7296";
+const PADDLE_MODEL = "PaddleOCR-VL-1.5";
+const PADDLE_OPTIONAL_PAYLOAD = {
+    "markdownIgnoreLabels": ["header", "header_image", "footer", "footer_image", "number", "footnote", "aside_text"],
+    "useDocOrientationClassify": false,
+    "useDocUnwarping": false,
+    "useLayoutDetection": true,
+    "useChartRecognition": false,
+    "useSealRecognition": true,
+    "useOcrForImageBlock": false,
+    "mergeTables": true,
+    "relevelTitles": true,
+    "layoutShapeMode": "auto",
+    "promptLabel": "ocr",
+    "repetitionPenalty": 1,
+    "temperature": 0,
+    "topP": 1,
+    "minPixels": 147384,
+    "maxPixels": 2822400,
+    "layoutNms": true,
+    "restructurePages": true
+};
 
 const upload = multer({ storage: multer.memoryStorage() });
 const jobs = new Map();
@@ -1312,40 +1339,114 @@ app.post('/api/exams/:id/download', async (req, res) => {
     }
 });
 
-// PDF Upload & Processing API (Microservice bridge to server.py)
+// PDF Upload & Processing API (Direct PaddleOCR Pipeline)
 app.post('/api/upload-pdf', upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'No file uploaded' });
   }
 
+  const jobId = Math.random().toString(36).substring(7);
+  jobs.set(jobId, { status: 'submitting', progress: 'Initializing...', result: null });
+
+  // Start background process
+  processPaddleOcr(jobId, req.file.buffer, req.file.originalname);
+
+  res.json({ success: true, jobId });
+});
+
+async function processPaddleOcr(localId, pdfBuffer, originalName) {
+  const job = jobs.get(localId);
   try {
+    // 1. Submit to PaddleOCR
     const formData = new FormData();
-    formData.append('file', req.file.buffer, {
-      filename: req.file.originalname,
-      contentType: req.file.mimetype,
+    formData.append('file', pdfBuffer, { filename: originalName, contentType: 'application/pdf' });
+    formData.append('model', PADDLE_MODEL);
+    formData.append('optionalPayload', JSON.stringify(PADDLE_OPTIONAL_PAYLOAD));
+
+    const submitResp = await axios.post(PADDLE_JOB_URL, formData, {
+      headers: { ...formData.getHeaders(), 'Authorization': `bearer ${PADDLE_TOKEN}` },
+      timeout: 45000
     });
 
-    const response = await axios.post('http://localhost:5000/api/upload-pdf', formData, {
-      headers: formData.getHeaders(),
-    });
+    if (submitResp.status !== 200) throw new Error(`PaddleOCR Submit Error: ${submitResp.status}`);
+    const paddleJobId = submitResp.data.data.jobId;
+    job.status = 'processing';
 
-    res.json({ success: true, jobId: response.data.jobId });
+    // 2. Polling
+    let jsonlUrl = '';
+    while (true) {
+      await sleep(3000);
+      const pollResp = await axios.get(`${PADDLE_JOB_URL}/${paddleJobId}`, {
+        headers: { 'Authorization': `bearer ${PADDLE_TOKEN}` }
+      });
+      const state = pollResp.data.data.state;
+
+      if (state === 'pending') job.progress = 'Pending in queue...';
+      else if (state === 'running') {
+        const prog = pollResp.data.data.extractProgress || {};
+        job.progress = `Processing page ${prog.extractedPages || '?'}/${prog.totalPages || '?'}`;
+      } else if (state === 'done') {
+        jsonlUrl = pollResp.data.data.resultUrl.jsonUrl;
+        break;
+      } else if (state === 'failed') {
+        throw new Error(pollResp.data.data.errorMsg || 'Conversion failed');
+      }
+    }
+
+    // 3. Download results
+    job.progress = 'Downloading results...';
+    const jsonlResp = await axios.get(jsonlUrl);
+    const lines = jsonlResp.data.trim().split('\n');
+    const allResults = [];
+    
+    // Setup image directory
+    const imgDir = path.join(__dirname, 'ocr_imgs', localId);
+    if (!fs.existsSync(imgDir)) fs.mkdirSync(imgDir, { recursive: true });
+
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const parsed = JSON.parse(line);
+      const result = parsed.result || parsed;
+      
+      if (result.layoutParsingResults) {
+        for (const pageRes of result.layoutParsingResults) {
+          // Process images
+          if (pageRes.markdown?.images) {
+            const newImages = {};
+            for (const [imgId, imgUrl] of Object.entries(pageRes.markdown.images)) {
+              try {
+                const localImgName = imgId.replace(/[/\\]/g, '_');
+                const localImgPath = path.join(imgDir, localImgName);
+                const imgResp = await axios.get(imgUrl, { responseType: 'arraybuffer' });
+                fs.writeFileSync(localImgPath, Buffer.from(imgResp.data));
+                newImages[imgId] = `/ocr_imgs/${localId}/${localImgName}`;
+              } catch (e) { newImages[imgId] = imgUrl; }
+            }
+            pageRes.markdown.images = newImages;
+          }
+          allResults.push(pageRes);
+        }
+      }
+    }
+
+    job.status = 'done';
+    job.result = { layoutParsingResults: allResults };
+    job.progress = 'Complete!';
+
   } catch (error) {
-    console.error('OCR service error:', error.message);
-    res.status(500).json({ success: false, message: 'OCR Service offline' });
+    console.error(`Job ${localId} failed:`, error.message);
+    job.status = 'failed';
+    job.error = error.message;
   }
+}
+
+app.get('/api/status/:id', (req, res) => {
+  const job = jobs.get(req.params.id);
+  if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
+  res.json(job);
 });
 
-app.get('/api/status/:id', async (req, res) => {
-  try {
-    const response = await axios.get(`http://localhost:5000/api/status/${req.params.id}`);
-    res.json(response.data);
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Microservice error' });
-  }
-});
-
-// Serve OCR images downloaded by Python script
+// Serve OCR images
 app.use('/ocr_imgs', express.static(path.join(__dirname, 'ocr_imgs')));
 
 // Production: Serve frontend
