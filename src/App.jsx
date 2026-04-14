@@ -3520,16 +3520,29 @@ export default function App() {
 
           {activeTab === 'Tests' && (
             <div className="max-w-4xl mx-auto mt-4 animate-in fade-in duration-500 flex flex-col items-center">
+              
+              {/* Browse Available Papers Section (On Top) */}
               <div className="w-full text-left mb-12">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2"><FolderSearch size={20} className="text-blue-600 dark:text-blue-500" /> Browse available papers</h3>
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer group transition-colors">View full library <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" /></div>
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <FolderSearch size={20} className="text-blue-600 dark:text-blue-500" />
+                    Browse available papers
+                  </h3>
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-500 hover:text-blue-600 dark:hover:text-blue-400 cursor-pointer group transition-colors">
+                    View full library <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  </div>
                 </div>
+
                 <div className="bg-white/80 dark:bg-[#161923]/60 backdrop-blur-xl border border-slate-200 dark:border-white/10 rounded-3xl p-6 shadow-sm dark:shadow-lg dark:shadow-black/20">
                   <div className="relative mb-6">
                     <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
-                    <input type="text" placeholder="Find a specific mock test or DPP..." className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-blue-500 transition-all text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600" />
+                    <input 
+                      type="text" 
+                      placeholder="Find a specific mock test or DPP..." 
+                      className="w-full bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl py-3 pl-12 pr-4 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-600"
+                    />
                   </div>
+
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[
                       { name: 'JEE Previous Year', count: '45 Papers', color: 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-200 dark:border-orange-500/20' },
@@ -3545,71 +3558,137 @@ export default function App() {
                   </div>
                 </div>
               </div>
+
+              {/* Divider */}
               <div className="w-full h-px bg-slate-200 dark:bg-white/5 mb-12"></div>
-              <div className="w-full max-w-4xl flex flex-col items-center gap-10 relative z-30 py-10">
-                {/* Hero Section */}
-                <div className="text-center space-y-4 max-w-2xl px-4">
-                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400 text-xs font-black uppercase tracking-widest mb-2">
-                    <Sparkles size={12} />
-                    Exam Portal v2.0
-                  </div>
-                  <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.1]">
-                    Practice with the <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-500 dark:from-blue-400 dark:to-indigo-300">Advanced Parser</span>
-                  </h1>
-                  <p className="text-slate-500 dark:text-slate-400 text-lg font-medium leading-relaxed">
-                    Upload your PDF or JSON papers and experience a full-featured exam interface with real-time analytics, LaTeX rendering, and precise scoring.
-                  </p>
-                </div>
 
-                {/* Launch Card */}
-                <div className="w-full bg-white dark:bg-[#161923] rounded-[2.5rem] border border-slate-200 dark:border-[#333942] p-10 md:p-16 shadow-2xl dark:shadow-black/60 relative overflow-hidden group">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-blue-600/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover:bg-blue-600/10 transition-colors duration-700"></div>
-                  <div className="absolute bottom-0 left-0 w-64 h-64 bg-indigo-600/5 rounded-full -ml-32 -mb-32 blur-3xl group-hover:bg-indigo-600/10 transition-colors duration-700"></div>
+              {/* Exam Format & Upload Container */}
+              <div className="w-full max-w-3xl flex flex-col gap-6 relative z-30">
+                {/* Exam Format Selector (Dropdown) */}
+                <div className="flex flex-col sm:flex-row justify-between items-start gap-4 bg-white dark:bg-[#161923] p-5 rounded-3xl border border-slate-200 dark:border-[#333942] shadow-sm dark:shadow-lg dark:shadow-black/30 relative z-40">
+                  <div className="mt-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                      <Settings size={20} className="text-blue-600 dark:text-blue-500" /> Exam Format
+                    </h3>
+                    <p className="text-[12px] text-slate-500 dark:text-slate-400 mt-1">Select the format before uploading your paper.</p>
+                  </div>
                   
-                  <div className="relative z-10 flex flex-col items-center text-center">
-                    <div className="w-20 h-20 bg-slate-50 dark:bg-[#0B0E14] rounded-3xl flex items-center justify-center border border-slate-200 dark:border-[#333942] shadow-sm mb-8 transform group-hover:rotate-6 transition-transform duration-500">
-                      <FileText size={36} className="text-blue-600 dark:text-blue-400" />
+                  <div className="flex flex-col w-full sm:w-[380px]">
+                    <div className="relative w-full z-50">
+                      <button 
+                        onClick={() => setIsDropdownOpen(!isDropdownOpen)} 
+                        className="w-full flex items-center justify-between p-4 rounded-2xl border border-slate-200 dark:border-[#444b55] bg-slate-50 dark:bg-[#0B0E14] hover:border-blue-400 dark:hover:border-blue-500/50 transition-all shadow-sm"
+                      >
+                        <div className="flex items-center gap-5">
+                          <div className="bg-white dark:bg-[#161923] rounded-2xl border border-slate-100 dark:border-[#2D313E] shadow-sm dark:shadow-none flex items-center justify-center w-[72px] h-[72px] shrink-0 overflow-hidden">
+                            {examTemplates.find(t => t.id === examTemplate)?.icon || <FileText size={44} className="text-slate-400" />}
+                          </div>
+                          <div className="text-left">
+                            <div className="font-bold text-slate-900 dark:text-white text-lg leading-tight">
+                              {examTemplates.find(t => t.id === examTemplate)?.name}
+                            </div>
+                            <div className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">
+                              {examTemplates.find(t => t.id === examTemplate)?.desc}
+                            </div>
+                          </div>
+                        </div>
+                        <ChevronDown size={24} className={`text-slate-400 transition-transform duration-300 mr-2 ${isDropdownOpen ? 'rotate-180' : ''}`} />
+                      </button>
+
+                      {isDropdownOpen && (
+                        <div className="absolute top-full left-0 sm:right-0 sm:left-auto mt-3 w-full sm:w-[380px] bg-white dark:bg-[#1C1F29] border border-slate-200 dark:border-[#444b55] rounded-3xl shadow-2xl dark:shadow-[0_15px_50px_rgba(0,0,0,0.8)] animate-in fade-in slide-in-from-top-2 duration-200 z-[100]">
+                          <div className="max-h-[460px] overflow-y-auto custom-scrollbar p-3 space-y-2 relative pointer-events-auto">
+                            {examTemplates.map(t => (
+                              <button 
+                                key={t.id} 
+                                onClick={() => {
+                                  setExamTemplate(t.id);
+                                  setIsDropdownOpen(false);
+                                }} 
+                                className={`w-full flex items-center gap-5 p-3 rounded-2xl text-left transition-all ${
+                                  examTemplate === t.id 
+                                    ? 'bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/30 shadow-sm' 
+                                    : 'border border-transparent hover:bg-slate-50 dark:hover:bg-[#2d323c]'
+                                }`}
+                              >
+                                <div className={`rounded-2xl border flex items-center justify-center w-[72px] h-[72px] shrink-0 overflow-hidden ${
+                                  examTemplate === t.id 
+                                    ? 'bg-white dark:bg-transparent border-blue-100 dark:border-blue-500/30' 
+                                    : 'bg-slate-50 dark:bg-black/20 border-slate-100 dark:border-[#333942]'
+                                }`}>
+                                  {t.icon}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-slate-900 dark:text-white text-base leading-tight mb-1">{t.name}</div>
+                                  <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">{t.desc}</div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    
-                    <h3 className="text-2xl font-black text-slate-900 dark:text-white mb-6">Ready to start your exam?</h3>
-                    
-                    <a 
-                      href="/exam-portal/index.html" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="group/btn relative inline-flex items-center justify-center gap-3 bg-blue-600 hover:bg-blue-700 text-white px-10 py-5 rounded-2xl font-black text-lg shadow-[0_10px_30px_rgba(37,99,235,0.3)] hover:shadow-[0_15px_40px_rgba(37,99,235,0.5)] transition-all duration-300 hover:-translate-y-1"
-                    >
-                      <img src="/logo.png" className="w-6 h-6 object-contain" alt="" />
-                      Launch Exam Portal
-                      <ChevronRight size={20} className="group-hover/btn:translate-x-1 transition-transform" />
-                    </a>
-                    
-                    <ul className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-2xl">
-                      {[
-                        { icon: <Search size={18} />, text: 'OCR PDF Parsing' },
-                        { icon: <Clock size={18} />, text: 'Timed Mock Tests' },
-                        { icon: <Activity size={18} />, text: 'In-depth Analytics' },
-                      ].map((item, i) => (
-                        <li key={i} className="flex items-center justify-center gap-2 text-sm font-bold text-slate-500 dark:text-slate-400 bg-slate-50 dark:bg-white/5 py-3 px-4 rounded-xl border border-slate-100 dark:border-white/10">
-                          {item.icon}
-                          {item.text}
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="mt-3 text-[11px] text-slate-500 dark:text-slate-400 flex items-start gap-1.5 leading-tight px-2">
+                      <Info size={14} className="shrink-0 mt-[1px] text-amber-500 dark:text-amber-400" />
+                      <span><strong>Disclaimer:</strong> Choose Auto-detect only if not listed here.</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Info Note */}
-                <div className="flex items-start gap-3 p-5 rounded-2xl bg-amber-50 dark:bg-amber-500/5 border border-amber-200/50 dark:border-amber-500/20 max-w-2xl text-amber-800 dark:text-amber-200">
-                  <Info size={20} className="shrink-0 mt-0.5 text-amber-600 dark:text-amber-400" />
-                  <p className="text-sm font-medium leading-relaxed">
-                    <strong>Pro Tip:</strong> The portal runs independently in a new tab. 
-                    Any papers you save in the portal will automatically appear in your dashboard history!
+                {/* Upload Area */}
+                <div className="w-full border-2 border-dashed border-slate-300 dark:border-[#444b55] rounded-[2rem] p-12 bg-white dark:bg-[#161923] hover:bg-slate-50 dark:hover:bg-[#1C1F29] hover:border-blue-400 dark:hover:border-blue-500/50 transition-colors cursor-pointer group relative flex flex-col items-center text-center z-10">
+                  <input type="file" className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept=".pdf,.json,.txt,.md" />
+                  <div className="mb-6 w-16 h-16 bg-slate-50 dark:bg-[#0B0E14] rounded-full flex items-center justify-center border border-slate-200 dark:border-[#333942] shadow-sm dark:shadow-md dark:shadow-black/40 group-hover:scale-110 transition-all duration-300">
+                    <UploadCloud size={28} className="text-blue-500 dark:text-blue-400" />
+                  </div>
+                  <h3 className="text-slate-900 dark:text-white font-bold text-xl mb-3 tracking-tight">Drag & drop your PDF or JSON file here</h3>
+                  <p className="text-slate-500 text-sm mb-6">or</p>
+                  <button className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-[0_4px_15px_rgba(37,99,235,0.2)] dark:shadow-[0_0_15px_rgba(37,99,235,0.3)] group-hover:bg-blue-700 dark:group-hover:bg-blue-500 group-hover:shadow-[0_6px_20px_rgba(37,99,235,0.3)] dark:group-hover:shadow-[0_0_25px_rgba(37,99,235,0.5)] transition-all pointer-events-none mb-6">
+                    Browse Files
+                  </button>
+                  <p className="text-[12px] font-medium text-slate-500">
+                    Supports PDF (via OCR), JSON, and OCR Markdown/Text files
                   </p>
                 </div>
               </div>
+
+              {/* Try Sample Data Button */}
+              <button className="mt-8 flex items-center gap-2 px-6 py-3 rounded-2xl border border-slate-200 dark:border-[#333942] bg-white/80 dark:bg-[#161923]/80 hover:bg-slate-50 dark:hover:bg-[#1C1F29] hover:border-slate-300 dark:hover:border-[#444b55] transition-colors text-slate-700 dark:text-slate-300 text-sm font-bold shadow-sm dark:shadow-lg dark:shadow-black/20">
+                <Sparkles size={16} className="text-amber-500 dark:text-amber-400" /> Try with sample data
+              </button>
+
+              {/* Saved Exams Section */}
+              <div className="w-full max-w-3xl mt-12 mb-8">
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white flex items-center gap-3 mb-6">
+                  <div className="flex -space-x-1.5">
+                    <div className="w-3.5 h-4 rounded-sm bg-emerald-500"></div>
+                    <div className="w-3.5 h-4 rounded-sm bg-rose-500"></div>
+                    <div className="w-3.5 h-4 rounded-sm bg-blue-500"></div>
+                  </div>
+                  Saved Exams
+                </h3>
+                
+                <div className="bg-white/80 dark:bg-[#161923]/80 backdrop-blur-xl border border-slate-200 dark:border-[#333942] rounded-2xl p-5 flex flex-col md:flex-row items-start md:items-center justify-between shadow-sm dark:shadow-lg dark:shadow-black/20 hover:border-slate-300 dark:hover:border-[#444b55] transition-colors group gap-4">
+                  <div>
+                    <h4 className="font-bold text-slate-900 dark:text-white text-[15px] mb-2">JEE - Rank Booster TEST SERIES</h4>
+                    <div className="flex items-center gap-3 text-xs text-slate-500 font-medium">
+                      <span className="text-orange-600 dark:text-orange-400">JEE Main</span>
+                      <span>75 Qs</span>
+                      <span>3 Apr 2026 10:49 am</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3 w-full md:w-auto">
+                    <button className="flex-1 md:flex-none bg-slate-50 dark:bg-[#1C1F29] border border-slate-200 dark:border-[#444b55] hover:border-blue-400 dark:hover:border-blue-500/30 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-white dark:hover:bg-[#22262e] text-slate-700 dark:text-slate-300 px-6 py-2.5 rounded-xl text-sm font-bold transition-all shadow-sm">
+                      Load
+                    </button>
+                    <button className="bg-rose-50 dark:bg-rose-500/10 border border-rose-100 dark:border-rose-500/20 hover:bg-rose-100 dark:hover:bg-rose-500/20 hover:border-rose-200 dark:hover:border-rose-500/30 text-rose-600 dark:text-rose-400 p-2.5 rounded-xl transition-all">
+                      <X size={18} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-          )}
+          )}}
 
           {activeTab === 'Notes' && (
             <div className="animate-in fade-in duration-500">
