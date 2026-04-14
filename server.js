@@ -9,6 +9,8 @@ import { fileURLToPath } from 'url';
 import OpenAI from 'openai';
 import { extractTextFromPdf } from './server/pdf_service.js';
 import multer from 'multer';
+import axios from 'axios';
+import FormData from 'form-data';
 
 const upload = multer({ storage: multer.memoryStorage() });
 const jobs = new Map();
@@ -1310,35 +1312,41 @@ app.post('/api/exams/:id/download', async (req, res) => {
     }
 });
 
-// PDF Upload & Processing API (for Exam Portal integration)
+// PDF Upload & Processing API (Microservice bridge to server.py)
 app.post('/api/upload-pdf', upload.single('file'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ success: false, message: 'No file uploaded' });
   }
 
-  const jobId = Math.random().toString(36).substring(7);
-  jobs.set(jobId, { status: 'processing', progress: '0%', result: null });
-
-  // Process in background
-  extractTextFromPdf(req.file.buffer, { maxPages: 50 })
-    .then(text => {
-      jobs.set(jobId, { status: 'done', result: text });
-    })
-    .catch(err => {
-      console.error(`Job ${jobId} failed:`, err);
-      jobs.set(jobId, { status: 'failed', error: err.message });
+  try {
+    const formData = new FormData();
+    formData.append('file', req.file.buffer, {
+      filename: req.file.originalname,
+      contentType: req.file.mimetype,
     });
 
-  res.json({ success: true, jobId });
+    const response = await axios.post('http://localhost:5000/api/upload-pdf', formData, {
+      headers: formData.getHeaders(),
+    });
+
+    res.json({ success: true, jobId: response.data.jobId });
+  } catch (error) {
+    console.error('OCR service error:', error.message);
+    res.status(500).json({ success: false, message: 'OCR Service offline' });
+  }
 });
 
-app.get('/api/status/:id', (req, res) => {
-  const job = jobs.get(req.params.id);
-  if (!job) {
-    return res.status(404).json({ success: false, message: 'Job not found' });
+app.get('/api/status/:id', async (req, res) => {
+  try {
+    const response = await axios.get(`http://localhost:5000/api/status/${req.params.id}`);
+    res.json(response.data);
+  } catch (error) {
+    res.status(500).json({ success: false, message: 'Microservice error' });
   }
-  res.json(job);
 });
+
+// Serve OCR images downloaded by Python script
+app.use('/ocr_imgs', express.static(path.join(__dirname, 'ocr_imgs')));
 
 // Production: Serve frontend
 if (process.env.NODE_ENV === 'production') {
