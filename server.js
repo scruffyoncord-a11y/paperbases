@@ -6,6 +6,7 @@ import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { exec } from 'child_process';
 import OpenAI from 'openai';
 import { extractTextFromPdf } from './server/pdf_service.js';
 import multer from 'multer';
@@ -1243,6 +1244,72 @@ app.delete('/api/chats/:chatId', async (req, res) => {
   }
 });
 
+// AI Study Plan Generator
+app.post('/api/ai/study-plan', async (req, res) => {
+  const { userId, subject, chapter } = req.body;
+  if (!subject || !chapter) return res.status(400).json({ success: false, message: 'Missing subject or chapter' });
+
+  try {
+    const systemPrompt = `You are an elite academic coach for JEE/NEET/BITSAT. 
+    Create a highly focused, premium study plan for the chapter: "${chapter}" in ${subject}.
+    Format your response as a concise list of 3-4 actionable focus areas.
+    Use bold text for emphasis.
+    Example format:
+    1. Master the **Core Principles** of X...
+    2. Focus on **High-Yield PYQs** like...
+    3. Practice **Rapid Recall** for...`;
+
+    const completion = await deepseek.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [{ role: 'system', content: systemPrompt }],
+      max_tokens: 500,
+      temperature: 0.7,
+    });
+
+    const plan = completion.choices[0]?.message?.content || 'Focus on core concepts and solving PYQs.';
+    res.json({ success: true, plan });
+  } catch (error) {
+    console.error('Study plan AI error:', error);
+    res.status(500).json({ success: false, message: 'AI service unavailable' });
+  }
+});
+
+// AI Flashcard Generator
+app.post('/api/ai/flashcards', async (req, res) => {
+  const { userId, subject, chapter } = req.body;
+  if (!subject || !chapter) return res.status(400).json({ success: false, message: 'Missing subject or chapter' });
+
+  try {
+    const systemPrompt = `You are a study expert. Create 4 high-quality active recall flashcards for the chapter: "${chapter}" in ${subject}.
+    Each flashcard must have a "q" (question) and an "a" (short, clear answer/core concept).
+    Your response must be a JSON array of objects. Example:
+    [{"q": "What is X?", "a": "X is Y."}, ...]
+    Only output the JSON array, no extra text.`;
+
+    const completion = await deepseek.chat.completions.create({
+      model: 'deepseek-chat',
+      messages: [{ role: 'system', content: systemPrompt }],
+      max_tokens: 1000,
+      temperature: 0.7,
+    });
+
+    let content = completion.choices[0]?.message?.content || '[]';
+    // Clean potential markdown code blocks
+    content = content.replace(/```json|```/g, '').trim();
+    
+    try {
+      const flashcards = JSON.parse(content);
+      res.json({ success: true, flashcards });
+    } catch (e) {
+      console.error('Failed to parse AI flashcards:', content);
+      res.status(500).json({ success: false, message: 'AI returned invalid format' });
+    }
+  } catch (error) {
+    console.error('Flashcard AI error:', error);
+    res.status(500).json({ success: false, message: 'AI service unavailable' });
+  }
+});
+
 // --- Exam Management API ---
 
 // Create an exam (centralized storage)
@@ -1481,6 +1548,39 @@ app.get('/api/status/:id', (req, res) => {
   const job = jobs.get(req.params.id);
   if (!job) return res.status(404).json({ success: false, message: 'Job not found' });
   res.json(job);
+});
+
+// --- PYQ Bridge API (Python) ---
+app.get('/api/pyqs/chapters', (req, res) => {
+  exec('python pyq_bridge.py chapters', { cwd: __dirname }, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`PYQ chapters error: ${stderr}`);
+      return res.status(500).json({ success: false, error: stderr || error.message });
+    }
+    try {
+      const data = JSON.parse(stdout);
+      res.json(data);
+    } catch (e) {
+      res.status(500).json({ success: false, error: 'Failed to parse python output' });
+    }
+  });
+});
+
+app.get('/api/pyqs/questions', (req, res) => {
+  const { chapter, years, limit } = req.query;
+  const cmd = `python pyq_bridge.py questions "${chapter || ''}" "${years || 'last_5'}" ${limit || 30}`;
+  exec(cmd, { cwd: __dirname }, (error, stdout, stderr) => {
+    if (error) {
+      console.error(`PYQ questions error: ${stderr}`);
+      return res.status(500).json({ success: false, error: stderr || error.message });
+    }
+    try {
+      const data = JSON.parse(stdout);
+      res.json(data);
+    } catch (e) {
+      res.status(500).json({ success: false, error: 'Failed to parse python output' });
+    }
+  });
 });
 
 // Serve OCR images
