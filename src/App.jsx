@@ -9,7 +9,7 @@ import {
   Upload, FolderSearch, ArrowRight, ArrowLeft, Settings, 
   Mail, ShieldCheck, LogOut, Bell, CheckCircle2, Clock, 
   Circle, Users, MessageSquare, ThumbsUp, MessageCircle, 
-  Share2, TrendingUp, Calendar, Awards, Flag, HelpCircle, 
+  Share2, TrendingUp, Calendar, Award, Flag, HelpCircle, 
   Lock, X, Building, GraduationCap, Filter, BarChart3, 
   Trash2, ExternalLink, Highlighter, Image as ImageIcon, 
   ZoomIn, ZoomOut, ChevronLeft, Send, RotateCcw, 
